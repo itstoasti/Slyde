@@ -1373,7 +1373,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 
 .slide-2 {
   background: var(--bg-dark);
-  padding: 86px 12px 145px 12px;
+  padding: 72px 12px 90px 12px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1566,24 +1566,23 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 .method-list {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 4px;
+  gap: 3.5px;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  justify-content: flex-start;
 }
 
 .method-step-item {
   background: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 8px;
-  padding: 5px 8px;
+  border-radius: 7px;
+  padding: 3.5px 7px;
   display: flex;
   align-items: flex-start;
-  gap: 6px;
+  gap: 5px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
-  flex: 1;
-  min-height: 0;
+  flex: none;
+  min-height: auto;
 }
 
 .card-style-dark-glass .method-step-item {
@@ -1592,12 +1591,12 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .step-number-badge {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
   background: var(--pill-num-bg);
   color: var(--pill-num-text);
-  border-radius: 4px;
-  font-size: 0.70rem;
+  border-radius: 3.5px;
+  font-size: 0.66rem;
   font-weight: 900;
   display: flex;
   align-items: center;
@@ -1608,9 +1607,9 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 
 .step-text,
 .step-instruction-text {
-  font-size: calc(0.70rem * var(--font-scale, 1));
+  font-size: calc(0.68rem * var(--font-scale, 1));
   color: #1f2937 !important;
-  line-height: 1.18;
+  line-height: 1.15;
   font-weight: 600;
   flex: 1;
   word-break: break-word;
@@ -1630,46 +1629,46 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 /* Micro & Compact Density Enhancements for 5-6+ Steps */
 .density-micro .method-list,
 .density-compact .method-list {
-  gap: 3px;
+  gap: 2.5px;
 }
 
 .density-micro .method-step-item,
 .density-compact .method-step-item {
-  padding: 3px 6px;
-  gap: 5px;
-  border-radius: 6px;
+  padding: 2.5px 5px;
+  gap: 4px;
+  border-radius: 5px;
 }
 
 .density-micro .step-number-badge,
 .density-compact .step-number-badge {
-  width: 16px;
-  height: 16px;
-  font-size: 0.64rem;
+  width: 15px;
+  height: 15px;
+  font-size: 0.60rem;
   border-radius: 3px;
 }
 
 .density-micro .ingredients-grid,
 .density-compact .ingredients-grid {
-  gap: 2px 4px;
+  gap: 2px 3.5px;
 }
 
 .density-micro .ingredient-pill,
 .density-compact .ingredient-pill {
-  padding: 2px 5px;
-  min-height: 16px;
-  border-radius: 4px;
+  padding: 1.5px 4.5px;
+  min-height: 14px;
+  border-radius: 3.5px;
 }
 
 .density-micro .step-text,
 .density-compact .step-text {
-  font-size: calc(0.66rem * var(--font-scale, 1));
-  line-height: 1.14;
+  font-size: calc(0.63rem * var(--font-scale, 1));
+  line-height: 1.10;
 }
 
 .density-micro .ing-text,
 .density-compact .ing-text {
-  font-size: calc(0.64rem * var(--font-scale, 1));
-  line-height: 1.10;
+  font-size: calc(0.61rem * var(--font-scale, 1));
+  line-height: 1.06;
 }
 
 /* Safe Macro Bar */
