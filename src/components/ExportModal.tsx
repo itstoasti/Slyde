@@ -299,15 +299,14 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       const slideDataUrls: string[] = [];
 
       const uploadBlobToPublicHost = async (blob: Blob, filename: string): Promise<string | null> => {
-        // Upload directly from browser to Litterbox (CORS allowed: access-control-allow-origin: *)
-        // This avoids Vercel's 4.5MB serverless body limit which silently truncates large payloads
+        // 1. Direct browser upload to Litterbox (CORS enabled)
         try {
           const formData = new FormData();
           formData.append('reqtype', 'fileupload');
           formData.append('time', '72h');
           formData.append('fileToUpload', blob, filename);
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 30000);
+          const timeoutId = setTimeout(() => controller.abort(), 20000);
           const res = await fetch('https://litterbox.catbox.moe/resources/internals/api.php', {
             method: 'POST',
             body: formData,
@@ -316,15 +315,14 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           clearTimeout(timeoutId);
           const url = (await res.text()).trim();
           if (url && url.startsWith('http')) {
-            console.log(`[Slyde] Uploaded ${filename} (${(blob.size / 1024).toFixed(1)}KB) → ${url}`);
+            console.log(`[Slyde] Direct uploaded ${filename} (${(blob.size / 1024).toFixed(1)}KB) → ${url}`);
             return url;
           }
-          console.warn(`[Slyde] Litterbox returned non-URL for ${filename}:`, url);
         } catch (e) {
-          console.warn(`[Slyde] Direct Litterbox upload failed for ${filename}:`, e);
+          console.warn(`[Slyde] Direct upload failed for ${filename}:`, e);
         }
 
-        // Fallback: upload via our own serverless endpoint (works for smaller files < 4.5MB)
+        // 2. Serverless fallback via /api/upload-media (with manual multipart binary streaming)
         try {
           const dataUrl = await new Promise<string>((resolve) => {
             const reader = new FileReader();
@@ -341,10 +339,20 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             console.log(`[Slyde] Fallback uploaded ${filename} → ${json.url}`);
             return json.url;
           }
-          console.warn(`[Slyde] Fallback upload failed for ${filename}:`, json);
         } catch (e) {
           console.warn(`[Slyde] Fallback upload error for ${filename}:`, e);
         }
+
+        // 3. Fallback: return dataUrl so serverless backend resolves it directly
+        try {
+          const dataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          return dataUrl;
+        } catch (e) {}
+
         return null;
       };
 
@@ -367,14 +375,17 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         }
       }
 
-      const hasYouTube = bufferConfig.profiles?.some(
-        p => p.service.toLowerCase().includes('youtube') && bufferConfig.selectedProfileIds?.includes(p.id)
-      );
+      const hasYouTube = (bufferConfig.profiles || []).some(
+        p => p.service.toLowerCase().includes('youtube') && (bufferConfig.selectedProfileIds || []).includes(p.id)
+      ) || (bufferConfig.selectedProfileIds || []).some(id => {
+        const p = bufferConfig.profiles?.find(prof => prof.id === id);
+        return p ? p.service.toLowerCase().includes('youtube') : false;
+      });
 
       let videoPublicUrl: string | undefined = undefined;
       if (hasYouTube && elements.length > 0) {
         setBufferStatus({ loading: true, message: 'Rendering 60 FPS YouTube Shorts video...' });
-        const videoBlob = await createSlideshowVideo(elements, [2.5, 5.0, 1.5]);
+        const videoBlob = await createSlideshowVideo(elements, [2.0, 3.5, 1.5]);
         const videoExt = videoBlob.type.includes('mp4') ? 'mp4' : 'webm';
         console.log(`[Slyde] Video blob: ${(videoBlob.size / (1024 * 1024)).toFixed(2)}MB, type=${videoBlob.type}`);
         setBufferStatus({ loading: true, message: 'Uploading video for YouTube Studio...' });
