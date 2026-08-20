@@ -1,6 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { waitUntil } from '@vercel/functions';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
+
+const processedUpdates = new Set<number>();
 
 // Decode HTML entities
 function decodeEntities(str: string): string {
@@ -310,20 +313,20 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
           document.body.appendChild(canvas);
           const ctx = canvas.getContext('2d', { alpha: false })!;
 
-          const fps = 60;
-          const durations = [2.0, 3.5, 1.5]; // 7.0s total pacing
+          const fps = 30;
+          const durations = [1.5, 2.5, 1.0]; // 5.0s total pacing (Hook 1.5s, Recipe 2.5s, CTA 1.0s)
           const slideFrameCounts = durations.map(d => Math.round(d * fps));
           const slideStartFrames = [0];
           for (let i = 0; i < durations.length; i++) {
             slideStartFrames.push(slideStartFrames[i] + slideFrameCounts[i]);
           }
           const totalFrames = slideStartFrames[durations.length];
-          const transitionFrames = Math.round(fps * 0.35);
+          const transitionFrames = Math.round(fps * 0.3);
 
           const stream = canvas.captureStream(fps);
           const recorder = new MediaRecorder(stream, {
             mimeType: 'video/webm',
-            videoBitsPerSecond: 5000000
+            videoBitsPerSecond: 4500000
           });
           const chunks: Blob[] = [];
           recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
@@ -474,6 +477,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).send('OK (no update)');
   }
 
+  const updateId = update.update_id;
+  if (updateId && processedUpdates.has(updateId)) {
+    return res.status(200).send('OK (duplicate)');
+  }
+  if (updateId) {
+    processedUpdates.add(updateId);
+    if (processedUpdates.size > 200) {
+      const first = processedUpdates.values().next().value;
+      if (first !== undefined) processedUpdates.delete(first);
+    }
+  }
+
   const msg = update.message || update.channel_post || update.edited_message || update.edited_channel_post;
   if (!msg) {
     return res.status(200).send('OK (no message)');
@@ -508,48 +523,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const modeText = isVideoOnly ? '🎬 60 FPS Video' : (isSlidesOnly ? '📸 3 Social Slides' : '⚡ 60 FPS Video + 3 Slides');
 
-    // 1. Immediate acknowledgment
-    await sendTelegramMessage(botToken, chatId, messageThreadId, `👨‍🍳 <b>Extracting recipe & generating ${modeText}...</b>`);
+    // Run processing asynchronously with Vercel waitUntil and return 200 OK immediately
+    waitUntil((async () => {
+      // 1. Immediate acknowledgment
+      await sendTelegramMessage(botToken, chatId, messageThreadId, `👨‍🍳 <b>Extracting recipe & generating ${modeText}...</b>`);
 
-    try {
-      const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'slyde-bay.vercel.app';
-      const recipe = await extractRecipeServer(recipeUrl);
-
-      // 2. Generate viral AI caption & hook
-      const { caption, hook } = await generateAICaptionServer(recipe);
-      if (hook) {
-        recipe.shortHook = hook.replace(/🍽️/g, '').trim();
-      }
-
-      if (isCaptionOnly) {
-        await sendTelegramMessage(botToken, chatId, messageThreadId, caption);
-        return res.status(200).send('OK');
-      }
-
-      // 3. Render slides & video with Serverless Chromium
       try {
-        const needsVideo = isVideoOnly || !isSlidesOnly;
-        const media = await captureMediaServerless(recipe, host, needsVideo);
+        const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'slyde-bay.vercel.app';
+        const recipe = await extractRecipeServer(recipeUrl);
 
-        // Send 60 FPS Video if requested
-        if (media.videoBuffer && (isVideoOnly || !isSlidesOnly)) {
-          await sendTelegramVideo(botToken, chatId, messageThreadId, media.videoBuffer, recipe.title);
+        // 2. Generate viral AI caption & hook
+        const { caption, hook } = await generateAICaptionServer(recipe);
+        if (hook) {
+          recipe.shortHook = hook.replace(/🍽️/g, '').trim();
         }
 
-        // Send 3-slide photo album if requested
-        if (media.slides && (isSlidesOnly || !isVideoOnly)) {
-          await sendTelegramAlbum(botToken, chatId, messageThreadId, media.slides, recipe.title);
+        if (isCaptionOnly) {
+          await sendTelegramMessage(botToken, chatId, messageThreadId, caption);
+          return;
         }
-      } catch (renderErr: any) {
-        console.warn('Chromium render failed in serverless:', renderErr.message);
+
+        // 3. Render slides & video with Serverless Chromium
+        try {
+          const needsVideo = isVideoOnly || !isSlidesOnly;
+          const media = await captureMediaServerless(recipe, host, needsVideo);
+
+          // Send 60 FPS Video if requested
+          if (media.videoBuffer && (isVideoOnly || !isSlidesOnly)) {
+            await sendTelegramVideo(botToken, chatId, messageThreadId, media.videoBuffer, recipe.title);
+          }
+
+          // Send 3-slide photo album if requested
+          if (media.slides && (isSlidesOnly || !isVideoOnly)) {
+            await sendTelegramAlbum(botToken, chatId, messageThreadId, media.slides, recipe.title);
+          }
+        } catch (renderErr: any) {
+          console.warn('Chromium render failed in serverless:', renderErr.message);
+        }
+
+        // 4. Send clean viral caption
+        await sendTelegramMessage(botToken, chatId, messageThreadId, caption);
+
+      } catch (err: any) {
+        await sendTelegramMessage(botToken, chatId, messageThreadId, `⚠️ Error processing recipe: ${err.message}`);
       }
+    })());
 
-      // 4. Send clean viral caption
-      await sendTelegramMessage(botToken, chatId, messageThreadId, caption);
-
-    } catch (err: any) {
-      await sendTelegramMessage(botToken, chatId, messageThreadId, `⚠️ Error processing recipe: ${err.message}`);
-    }
+    return res.status(200).send('OK');
   }
 
   return res.status(200).send('OK');
