@@ -201,19 +201,22 @@ export async function testOpenRouterApiKey(apiKey: string, model: string = 'meta
     return { success: false, message: 'Please enter an OpenRouter API Key.' };
   }
 
+  const modelToUse = model || 'meta-llama/llama-3.3-70b-instruct';
+
   try {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://slyde-bay.vercel.app';
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${cleanKey}`,
-        'HTTP-Referer': window.location.origin,
+        'HTTP-Referer': origin,
         'X-Title': 'Slyde Carousel Studio'
       },
       body: JSON.stringify({
-        model: model || 'meta-llama/llama-3.3-70b-instruct',
-        messages: [{ role: 'user', content: 'Respond with the single word "READY"' }],
-        max_tokens: 10
+        model: modelToUse,
+        messages: [{ role: 'user', content: 'Say READY' }],
+        max_tokens: 50
       })
     });
 
@@ -225,17 +228,17 @@ export async function testOpenRouterApiKey(apiKey: string, model: string = 'meta
       };
     }
 
-    const reply = data.choices?.[0]?.message?.content || '';
-    if (reply) {
+    const reply = data.choices?.[0]?.message?.content || data.choices?.[0]?.text || data.choices?.[0]?.message?.reasoning;
+    if (reply || data.id || (Array.isArray(data.choices) && data.choices.length > 0)) {
       return {
         success: true,
-        message: `✨ OpenRouter API Key verified with ${model}!`
+        message: `✨ OpenRouter verified and connected with ${modelToUse}!`
       };
     }
 
     return {
       success: false,
-      message: 'OpenRouter API responded with no content.'
+      message: 'OpenRouter returned an empty response. Check if model ID is available.'
     };
   } catch (error: any) {
     return {
@@ -326,7 +329,7 @@ Recipe Title: "${recipe.title}"
 Key Ingredients: ${ingList}
 Time: ${recipe.cookTime || recipe.prepTime || '30m'}
 
-Respond in JSON format:
+Respond with ONLY a raw JSON object with these exact keys:
 {
   "teaser": "1 punchy viral sentence (8-14 words) about taste, speed, or texture.",
   "hashtags": ["#SnapRecipes", "#SpecificDishName", "#KeyIngredient", "#MealCategory", "#CookingStyle", "#EasyRecipes"]
@@ -336,34 +339,41 @@ Guidelines:
 - "teaser" MUST be a complete grammatical sentence. Do not mention ingredient counts, step numbers, or emojis.
 - "hashtags" MUST be 5-6 highly relevant, specific hashtags tailored to this exact recipe.`;
 
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://slyde-bay.vercel.app';
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey.trim()}`,
-        'HTTP-Referer': window.location.origin,
+        'HTTP-Referer': origin,
         'X-Title': 'Slyde Carousel Studio'
       },
       body: JSON.stringify({
         model: model || 'meta-llama/llama-3.3-70b-instruct',
         messages: [{ role: 'user', content: prompt }],
-        response_format: { type: 'json_object' }
+        max_tokens: 300
       })
     });
 
     if (res.ok) {
       const data = await res.json();
-      const rawText = data.choices?.[0]?.message?.content?.trim();
-      if (rawText) {
+      let rawText = data.choices?.[0]?.message?.content?.trim() || data.choices?.[0]?.text?.trim() || '';
+      // Strip markdown code fences if model returned ```json ... ```
+      rawText = rawText.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
         try {
-          const parsed = JSON.parse(rawText);
+          const parsed = JSON.parse(jsonMatch[0]);
           return {
             hook: parsed.teaser,
             hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags : []
           };
-        } catch (e) {
-          return { hook: rawText.replace(/^["']|["']$/g, '').trim(), hashtags: [] };
-        }
+        } catch (e) {}
+      }
+
+      if (rawText && rawText.length > 5) {
+        return { hook: rawText.replace(/^["']|["']$/g, '').trim(), hashtags: [] };
       }
     }
   } catch (e) {
