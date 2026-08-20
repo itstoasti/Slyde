@@ -1373,7 +1373,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 
 .slide-2 {
   background: var(--bg-dark);
-  padding: 60px 12px 75px 12px;
+  padding: 44px 10px 48px 10px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1544,9 +1544,9 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .ing-text {
-  font-size: calc(0.74rem * var(--font-scale, 1));
+  font-size: calc(0.66rem * var(--font-scale, 1));
   color: #111827 !important;
-  line-height: 1.15;
+  line-height: 1.10;
   white-space: normal;
   word-break: break-word;
   flex: 1;
@@ -1566,7 +1566,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 .method-list {
   display: flex;
   flex-direction: column;
-  gap: 3.5px;
+  gap: 2.5px;
   flex: 1;
   min-height: 0;
   justify-content: flex-start;
@@ -1575,11 +1575,11 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 .method-step-item {
   background: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 7px;
-  padding: 4px 7px;
+  border-radius: 6px;
+  padding: 3px 6px;
   display: flex;
   align-items: flex-start;
-  gap: 6px;
+  gap: 5px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
   flex: none;
   min-height: auto;
@@ -1591,12 +1591,12 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .step-number-badge {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   background: var(--pill-num-bg);
   color: var(--pill-num-text);
-  border-radius: 4px;
-  font-size: 0.70rem;
+  border-radius: 3.5px;
+  font-size: 0.64rem;
   font-weight: 900;
   display: flex;
   align-items: center;
@@ -1607,9 +1607,9 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 
 .step-text,
 .step-instruction-text {
-  font-size: calc(0.72rem * var(--font-scale, 1));
+  font-size: calc(0.66rem * var(--font-scale, 1));
   color: #111827 !important;
-  line-height: 1.15;
+  line-height: 1.12;
   font-weight: 700;
   flex: 1;
   word-break: break-word;
@@ -1634,16 +1634,16 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 
 .density-micro .method-step-item,
 .density-compact .method-step-item {
-  padding: 2.5px 5px;
-  gap: 4.5px;
-  border-radius: 5px;
+  padding: 2px 4.5px;
+  gap: 4px;
+  border-radius: 4.5px;
 }
 
 .density-micro .step-number-badge,
 .density-compact .step-number-badge {
-  width: 15px;
-  height: 15px;
-  font-size: 0.62rem;
+  width: 14px;
+  height: 14px;
+  font-size: 0.58rem;
   border-radius: 3px;
 }
 
@@ -1654,23 +1654,23 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 
 .density-micro .ingredient-pill,
 .density-compact .ingredient-pill {
-  padding: 1.5px 4px;
-  min-height: 13px;
+  padding: 1.5px 3.5px;
+  min-height: 12px;
   border-radius: 3px;
 }
 
 .density-micro .step-text,
 .density-compact .step-text {
-  font-size: calc(0.67rem * var(--font-scale, 1));
-  line-height: 1.12;
+  font-size: calc(0.62rem * var(--font-scale, 1));
+  line-height: 1.08;
   font-weight: 700;
   color: #111827 !important;
 }
 
 .density-micro .ing-text,
 .density-compact .ing-text {
-  font-size: calc(0.65rem * var(--font-scale, 1));
-  line-height: 1.08;
+  font-size: calc(0.60rem * var(--font-scale, 1));
+  line-height: 1.05;
   font-weight: 700;
   color: #111827 !important;
 }
