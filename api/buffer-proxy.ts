@@ -117,24 +117,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const trimmed = rawUrl.trim();
         if (!trimmed) return null;
 
-        // If base64 data URI, upload to temporary public image host with wsrv wrapper
+        // If base64 data URI, upload to temporary public image host
         if (trimmed.startsWith('data:image/')) {
           try {
             const match = trimmed.match(/^data:image\/(\w+);base64,(.+)$/);
             const ext = match ? (match[1] === 'jpeg' ? 'jpg' : match[1]) : 'png';
             const b64Data = match ? match[2] : trimmed;
             const buffer = Buffer.from(b64Data, 'base64');
-            const formData = new FormData();
-            const blob = new Blob([buffer], { type: `image/${ext}` });
-            formData.append('reqtype', 'fileupload');
-            formData.append('time', '72h');
-            formData.append('fileToUpload', blob, `slide-${index + 1}.${ext}`);
+            const safeFilename = `slide-${index + 1}.${ext}`;
+            const mime = `image/${ext}`;
+
+            const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
+            const preBuffer = Buffer.from(
+              `--${boundary}\r\n` +
+              `Content-Disposition: form-data; name="reqtype"\r\n\r\n` +
+              `fileupload\r\n` +
+              `--${boundary}\r\n` +
+              `Content-Disposition: form-data; name="time"\r\n\r\n` +
+              `72h\r\n` +
+              `--${boundary}\r\n` +
+              `Content-Disposition: form-data; name="fileToUpload"; filename="${safeFilename}"\r\n` +
+              `Content-Type: ${mime}\r\n\r\n`
+            );
+            const postBuffer = Buffer.from(`\r\n--${boundary}--\r\n`);
+            const fullPayload = Buffer.concat([preBuffer, buffer, postBuffer]);
 
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000);
+            const timeoutId = setTimeout(() => controller.abort(), 12000);
             const res = await fetch('https://litterbox.catbox.moe/resources/internals/api.php', {
               method: 'POST',
-              body: formData,
+              headers: {
+                'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                'Content-Length': String(fullPayload.length)
+              },
+              body: fullPayload,
               signal: controller.signal
             });
             clearTimeout(timeoutId);
@@ -182,17 +198,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const ext = match ? (match[1] === 'mp4' ? 'mp4' : 'webm') : 'mp4';
             const b64Data = match ? match[2] : trimmed;
             const buffer = Buffer.from(b64Data, 'base64');
-            const formData = new FormData();
-            const blob = new Blob([buffer], { type: `video/${ext}` });
-            formData.append('reqtype', 'fileupload');
-            formData.append('time', '72h');
-            formData.append('fileToUpload', blob, `recipe-video.${ext}`);
+            const safeFilename = `recipe-video.${ext}`;
+            const mime = `video/${ext}`;
+
+            const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
+            const preBuffer = Buffer.from(
+              `--${boundary}\r\n` +
+              `Content-Disposition: form-data; name="reqtype"\r\n\r\n` +
+              `fileupload\r\n` +
+              `--${boundary}\r\n` +
+              `Content-Disposition: form-data; name="time"\r\n\r\n` +
+              `72h\r\n` +
+              `--${boundary}\r\n` +
+              `Content-Disposition: form-data; name="fileToUpload"; filename="${safeFilename}"\r\n` +
+              `Content-Type: ${mime}\r\n\r\n`
+            );
+            const postBuffer = Buffer.from(`\r\n--${boundary}--\r\n`);
+            const fullPayload = Buffer.concat([preBuffer, buffer, postBuffer]);
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 20000);
             const res = await fetch('https://litterbox.catbox.moe/resources/internals/api.php', {
               method: 'POST',
-              body: formData,
+              headers: {
+                'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                'Content-Length': String(fullPayload.length)
+              },
+              body: fullPayload,
               signal: controller.signal
             });
             clearTimeout(timeoutId);

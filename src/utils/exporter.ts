@@ -191,7 +191,7 @@ export async function createSlideshowVideo(
 
   const mediaRecorder = new MediaRecorder(stream, {
     mimeType: MediaRecorder.isTypeSupported(mimeType) ? mimeType : undefined,
-    videoBitsPerSecond: 16000000 // 16 Mbps ultra high quality for YouTube compression resilience
+    videoBitsPerSecond: 5000000 // 5 Mbps HD quality for optimal upload speed and YouTube Shorts rendering
   });
 
   const chunks: Blob[] = [];

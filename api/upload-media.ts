@@ -48,17 +48,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const ext = isVideo ? (mime.includes('mp4') ? 'mp4' : 'webm') : (mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : 'png');
     const safeFilename = filename.includes('.') ? filename : `${filename}.${ext}`;
 
-    const formData = new FormData();
-    const blob = new Blob([buffer], { type: mime });
-    formData.append('reqtype', 'fileupload');
-    formData.append('time', '72h');
-    formData.append('fileToUpload', blob, safeFilename);
+    const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
+    const preBuffer = Buffer.from(
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="reqtype"\r\n\r\n` +
+      `fileupload\r\n` +
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="time"\r\n\r\n` +
+      `72h\r\n` +
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="fileToUpload"; filename="${safeFilename}"\r\n` +
+      `Content-Type: ${mime}\r\n\r\n`
+    );
+    const postBuffer = Buffer.from(`\r\n--${boundary}--\r\n`);
+    const fullPayload = Buffer.concat([preBuffer, buffer, postBuffer]);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 20000);
     const uploadRes = await fetch('https://litterbox.catbox.moe/resources/internals/api.php', {
       method: 'POST',
-      body: formData,
+      headers: {
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': String(fullPayload.length)
+      },
+      body: fullPayload,
       signal: controller.signal
     });
     clearTimeout(timeoutId);
