@@ -299,6 +299,32 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       const slideDataUrls: string[] = [];
 
       const uploadBlobToPublicHost = async (blob: Blob, filename: string): Promise<string | null> => {
+        // Upload directly from browser to Litterbox (CORS allowed: access-control-allow-origin: *)
+        // This avoids Vercel's 4.5MB serverless body limit which silently truncates large payloads
+        try {
+          const formData = new FormData();
+          formData.append('reqtype', 'fileupload');
+          formData.append('time', '72h');
+          formData.append('fileToUpload', blob, filename);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000);
+          const res = await fetch('https://litterbox.catbox.moe/resources/internals/api.php', {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          const url = (await res.text()).trim();
+          if (url && url.startsWith('http')) {
+            console.log(`[Slyde] Uploaded ${filename} (${(blob.size / 1024).toFixed(1)}KB) → ${url}`);
+            return url;
+          }
+          console.warn(`[Slyde] Litterbox returned non-URL for ${filename}:`, url);
+        } catch (e) {
+          console.warn(`[Slyde] Direct Litterbox upload failed for ${filename}:`, e);
+        }
+
+        // Fallback: upload via our own serverless endpoint (works for smaller files < 4.5MB)
         try {
           const dataUrl = await new Promise<string>((resolve) => {
             const reader = new FileReader();
@@ -312,10 +338,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           });
           const json = await res.json();
           if (json?.success && json?.url) {
+            console.log(`[Slyde] Fallback uploaded ${filename} → ${json.url}`);
             return json.url;
           }
+          console.warn(`[Slyde] Fallback upload failed for ${filename}:`, json);
         } catch (e) {
-          console.warn('Upload media error', e);
+          console.warn(`[Slyde] Fallback upload error for ${filename}:`, e);
         }
         return null;
       };

@@ -215,20 +215,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (videoUrl) {
         resolvedVideoUrl = await resolvePublicVideoUrl(videoUrl);
       }
+      console.log('[buffer-proxy] videoUrl received:', videoUrl ? `${String(videoUrl).substring(0, 80)}... (${String(videoUrl).length} chars)` : 'NONE');
+      console.log('[buffer-proxy] resolvedVideoUrl:', resolvedVideoUrl || 'NONE');
 
       let commonAssets: any[] | undefined = undefined;
       if (Array.isArray(mediaUrls) && mediaUrls.length > 0) {
+        console.log('[buffer-proxy] mediaUrls received:', mediaUrls.length, 'items, first:', String(mediaUrls[0]).substring(0, 80));
         const resolvedList = await Promise.all(mediaUrls.map((u, idx) => resolvePublicImageUrl(u, idx)));
+        console.log('[buffer-proxy] resolved images:', resolvedList.filter(Boolean).length, '/', resolvedList.length);
         const valid = resolvedList.filter(Boolean).map(url => ({ image: { url } }));
         if (valid.length > 0) {
           commonAssets = valid;
         }
       } else if (mediaUrl) {
+        console.log('[buffer-proxy] single mediaUrl received:', String(mediaUrl).substring(0, 80));
         const single = await resolvePublicImageUrl(mediaUrl, 0);
         if (single) {
           commonAssets = [{ image: { url: single } }];
         }
+      } else {
+        console.log('[buffer-proxy] NO mediaUrls or mediaUrl received');
       }
+      console.log('[buffer-proxy] commonAssets count:', commonAssets?.length || 0);
 
       // 2. Post via modern GraphQL mutation for each selected channel
       let successCount = 0;
@@ -344,6 +352,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             input.assets = commonAssets;
           }
 
+          console.log(`[buffer-proxy] Channel ${channelName} (${svc}): mode=${input.mode}, assets=${JSON.stringify(input.assets?.map((a: any) => a.video ? {video: a.video.url?.substring(0, 60)} : {image: a.image?.url?.substring(0, 60)}))}, metadata=${JSON.stringify(input.metadata)}`);
+
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 12000);
           let postRes = await fetch('https://api.buffer.com', {
@@ -359,6 +369,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           let postData = await postRes.json();
           let postPayload = postData.data?.createPost;
+          console.log(`[buffer-proxy] Channel ${channelName} (${svc}) response: postId=${postPayload?.post?.id || 'NONE'}, error=${postPayload?.message || postData.errors?.[0]?.message || 'none'}`);
 
           // If failed due to schedule time collision or past date error, retry cleanly as addToQueue without dueAt
           const errorMsg = (postData.errors?.[0]?.message || postPayload?.message || '').toLowerCase();
