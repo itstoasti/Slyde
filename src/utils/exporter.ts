@@ -144,8 +144,9 @@ export async function createSlideshowVideo(
   const ctx = canvas.getContext('2d')!;
 
   const fps = 30;
-  const totalFramesPerSlide = fps * slideDurationSec;
-  const transitionFrames = Math.round(fps * 0.35); // 0.35s smooth mobile swipe transition
+  const frameDurationMs = 1000 / fps; // 33.3ms per frame
+  const totalFramesPerSlide = Math.round(fps * slideDurationSec);
+  const transitionFrames = Math.round(fps * 0.4); // 0.4s smooth swipe transition
   const totalSlides = images.length;
   const totalFrames = totalFramesPerSlide * totalSlides;
 
@@ -182,8 +183,10 @@ export async function createSlideshowVideo(
 
     let frame = 0;
 
-    const renderFrame = () => {
+    // Use setInterval for real-time frame pacing instead of requestAnimationFrame
+    const intervalId = setInterval(() => {
       if (frame >= totalFrames) {
+        clearInterval(intervalId);
         mediaRecorder.stop();
         return;
       }
@@ -217,9 +220,6 @@ export async function createSlideshowVideo(
 
       frame++;
       onProgress?.(40 + Math.round((frame / totalFrames) * 55));
-      requestAnimationFrame(renderFrame);
-    };
-
-    renderFrame();
+    }, frameDurationMs);
   });
 }
