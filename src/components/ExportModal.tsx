@@ -297,6 +297,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       const elements = getSlideElements();
       const slidePublicUrls: string[] = [];
       const slideDataUrls: string[] = [];
+      let videoPublicUrl: string | undefined = undefined;
 
       const uploadBlobToPublicHost = async (blob: Blob, filename: string): Promise<string | null> => {
         // 1. Direct browser upload to Litterbox (CORS enabled)
@@ -358,7 +359,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
       if (elements.length > 0) {
         for (let i = 0; i < elements.length; i++) {
-          setBufferStatus({ loading: true, message: `Rendering & preparing Slide ${i + 1}/${elements.length}...` });
+          setBufferStatus({ loading: true, message: `📸 Rendering Slide ${i + 1}/${elements.length}...` });
           const blob = await captureSlideAsBlob(elements[i], 1.5);
           
           const pubUrl = await uploadBlobToPublicHost(blob, `slide-${i + 1}.png`);
@@ -373,27 +374,18 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           });
           slideDataUrls.push(dataUrl);
         }
-      }
 
-      const hasYouTube = (bufferConfig.profiles || []).some(
-        p => p.service.toLowerCase().includes('youtube') && (bufferConfig.selectedProfileIds || []).includes(p.id)
-      ) || (bufferConfig.selectedProfileIds || []).some(id => {
-        const p = bufferConfig.profiles?.find(prof => prof.id === id);
-        return p ? p.service.toLowerCase().includes('youtube') : false;
-      });
-
-      let videoPublicUrl: string | undefined = undefined;
-      if (hasYouTube && elements.length > 0) {
-        setBufferStatus({ loading: true, message: 'Rendering 60 FPS YouTube Shorts video...' });
+        // Always render and upload the 60 FPS video whenever slides are exported
+        setBufferStatus({ loading: true, message: '🎬 Rendering 60 FPS video for YouTube Shorts...' });
         const videoBlob = await createSlideshowVideo(elements, [2.0, 3.5, 1.5]);
         const videoExt = videoBlob.type.includes('mp4') ? 'mp4' : 'webm';
         console.log(`[Slyde] Video blob: ${(videoBlob.size / (1024 * 1024)).toFixed(2)}MB, type=${videoBlob.type}`);
-        setBufferStatus({ loading: true, message: 'Uploading video for YouTube Studio...' });
+        setBufferStatus({ loading: true, message: '🚀 Uploading video for YouTube Studio...' });
         videoPublicUrl = (await uploadBlobToPublicHost(videoBlob, `recipe-video.${videoExt}`)) || undefined;
         console.log(`[Slyde] Video public URL: ${videoPublicUrl || 'FAILED'}`);
       }
 
-      setBufferStatus({ loading: true, message: `Dispatching across ${bufferConfig.selectedProfileIds.length} channel(s)...` });
+      setBufferStatus({ loading: true, message: `✨ Dispatching across ${bufferConfig.selectedProfileIds.length} channel(s)...` });
       console.log(`[Slyde] Slide public URLs (${slidePublicUrls.length}):`, slidePublicUrls);
       console.log(`[Slyde] Slide data URLs (${slideDataUrls.length}):`, slideDataUrls.map(u => u.substring(0, 60) + '...'));
       console.log(`[Slyde] Video public URL:`, videoPublicUrl || 'NONE');
