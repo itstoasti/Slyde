@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "slyde": {
+      "command": "node",
+      "args": ["/Users/deanfieldz/Desktop/Code Projects/slyde/mcp-server.js"],
+      "env": {
+        "BRAND_NAME": "SnapRecipes",
+        "CTA_URL": "https://snaprecipes.xyz"
+      }
+    }
+  }
+}

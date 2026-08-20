@@ -1,0 +1,27 @@
+{
+  "accessToken": "KYCQrWFoo9QYHgx9JwzsZhIZeF_aJY9S5Hc-FbaadNg",
+  "selectedProfileIds": [
+    "6a83d508ccaf649a67c85236"
+  ],
+  "profiles": [
+    {
+      "id": "6a70269299afb44349f0a8b9",
+      "formatted_username": "snap.recipes_",
+      "service": "instagram",
+      "avatar": "https://buffer-channel-avatars-bucket.s3.amazonaws.com/6a70269299afb44349f0a8b9_1785734803079"
+    },
+    {
+      "id": "6a7027fd99afb44349f0ac54",
+      "formatted_username": "snap.recipes_",
+      "service": "threads",
+      "avatar": "https://buffer-channel-avatars-bucket.s3.amazonaws.com/6a7027fd99afb44349f0ac54_1785735165716"
+    },
+    {
+      "id": "6a83d508ccaf649a67c85236",
+      "formatted_username": "snap.recipes",
+      "service": "tiktok",
+      "avatar": "https://buffer-channel-avatars-bucket.s3.amazonaws.com/6a83d508ccaf649a67c85236_1787024648372"
+    }
+  ],
+  "scheduleMode": "queue"
+}

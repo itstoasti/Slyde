@@ -1,0 +1,36 @@
+{
+  "name": "slyde",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n \"studio,bot\" -c \"cyan,magenta\" \"vite\" \"node bot.js\"",
+    "start": "concurrently -k -n \"studio,bot\" -c \"cyan,magenta\" \"vite\" \"node bot.js\"",
+    "studio": "vite",
+    "bot": "node bot.js",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@resvg/resvg-js": "^2.6.2",
+    "canvas-confetti": "^1.9.4",
+    "html-to-image": "^1.11.11",
+    "jszip": "^3.10.1",
+    "lucide-react": "^1.16.0",
+    "puppeteer-core": "^25.8.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/node": "^22.13.4",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vercel/node": "^5.10.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0"
+  }
+}
