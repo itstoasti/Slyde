@@ -240,13 +240,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             postText = longCaption;
           }
 
-          const shouldDraft = postAsDraft || (isYouTube && youtubeAsDraft);
+          const effectiveMode = shouldDraft ? 'addToQueue' : shareMode;
 
           const input: any = {
             channelId,
             text: postText,
-            schedulingType: 'automatic',
-            mode: shouldDraft ? 'addToQueue' : shareMode,
+            mode: effectiveMode,
             needsApproval: false,
             saveToDraft: !!shouldDraft,
             metadata: {
@@ -260,8 +259,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
           };
 
-          if (dueAt) {
+          // Never provide dueAt when adding to queue or drafting (Buffer calculates queue time automatically)
+          if (effectiveMode === 'customScheduled' && dueAt) {
             input.dueAt = dueAt;
+            input.schedulingType = 'custom';
+          } else {
+            input.schedulingType = 'automatic';
+            delete input.dueAt;
           }
 
           if (commonAssets && commonAssets.length > 0) {
@@ -283,6 +287,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           let postData = await postRes.json();
           let postPayload = postData.data?.createPost;
+
+          // If failed due to schedule time collision on queue/draft, retry cleanly as addToQueue without dueAt
+          const errorMsg = (postData.errors?.[0]?.message || postPayload?.message || '').toLowerCase();
+          if (!postPayload?.post?.id && errorMsg.includes('scheduled time should not be provided')) {
+            delete input.dueAt;
+            input.mode = 'addToQueue';
+            input.schedulingType = 'automatic';
+            postRes = await fetch('https://api.buffer.com', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${cleanToken}`
+              },
+              body: JSON.stringify({ query: mutation, variables: { input } })
+            });
+            postData = await postRes.json();
+            postPayload = postData.data?.createPost;
+          }
 
           // If failed due to image read error and not TikTok, retry without invalid asset
           if (
