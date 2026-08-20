@@ -2,12 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { waitUntil } from '@vercel/functions';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
-import fs from 'fs';
 
-const execFileAsync = promisify(execFile);
 const processedUpdates = new Set<number>();
 
 // Decode HTML entities
@@ -255,36 +250,6 @@ Save this recipe on ${brandName} — skip the life story, get straight to cookin
   return { caption, hook };
 }
 
-async function transcodeWebmToMp4(webmBuffer: Buffer): Promise<Buffer> {
-  const tmpIn = `/tmp/in-${Date.now()}-${Math.random().toString(36).substring(2)}.webm`;
-  const tmpOut = `/tmp/out-${Date.now()}-${Math.random().toString(36).substring(2)}.mp4`;
-  try {
-    fs.writeFileSync(tmpIn, webmBuffer);
-    const ffmpegPath = ffmpegInstaller?.path || 'ffmpeg';
-    await execFileAsync(ffmpegPath, [
-      '-y',
-      '-i', tmpIn,
-      '-c:v', 'libx264',
-      '-pix_fmt', 'yuv420p',
-      '-profile:v', 'main',
-      '-preset', 'ultrafast',
-      '-movflags', '+faststart',
-      tmpOut
-    ]);
-
-    if (fs.existsSync(tmpOut)) {
-      const mp4Buf = fs.readFileSync(tmpOut);
-      return mp4Buf;
-    }
-  } catch (err: any) {
-    console.warn('FFmpeg H.264 transcode error:', err.message);
-  } finally {
-    try { if (fs.existsSync(tmpIn)) fs.unlinkSync(tmpIn); } catch (e) {}
-    try { if (fs.existsSync(tmpOut)) fs.unlinkSync(tmpOut); } catch (e) {}
-  }
-  return webmBuffer;
-}
-
 // Render 3 Slides and 60 FPS Video with Serverless Chromium
 async function captureMediaServerless(recipe: any, host: string, includeVideo: boolean = true): Promise<{ slides: (Buffer | Uint8Array)[]; videoBuffer: Buffer | null }> {
   let executablePath: string;
@@ -348,9 +313,35 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
           document.body.appendChild(canvas);
           const ctx = canvas.getContext('2d', { alpha: false })!;
 
-          const stream = canvas.captureStream(30);
-          const recorder = new MediaRecorder(stream, {
-            mimeType: 'video/webm',
+          // Generate silent audio track for YouTube / iOS audio mixing compatibility
+          let audioTracks: MediaStreamTrack[] = [];
+          let audioCtx: any = null;
+          let osc: any = null;
+          try {
+            audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const dest = audioCtx.createMediaStreamDestination();
+            osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            gain.gain.value = 0.0001; // Silent
+            osc.connect(gain);
+            gain.connect(dest);
+            osc.start();
+            audioTracks = dest.stream.getAudioTracks();
+          } catch (e) {}
+
+          const canvasStream = canvas.captureStream(30);
+          const combinedStream = new MediaStream([
+            ...canvasStream.getVideoTracks(),
+            ...audioTracks
+          ]);
+
+          let mimeType = 'video/webm;codecs=vp8,opus';
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'video/webm';
+          }
+
+          const recorder = new MediaRecorder(combinedStream, {
+            mimeType,
             videoBitsPerSecond: 4500000
           });
           const chunks: Blob[] = [];
@@ -358,7 +349,7 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
 
           const done = new Promise<string>(resolve => {
             recorder.onstop = () => {
-              const blob = new Blob(chunks, { type: 'video/webm' });
+              const blob = new Blob(chunks, { type: mimeType });
               const reader = new FileReader();
               reader.onloadend = () => resolve(reader.result as string);
               reader.readAsDataURL(blob);
@@ -375,6 +366,8 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
             if (elapsedMs >= totalDurationMs) {
               clearInterval(interval);
               recorder.stop();
+              try { if (osc) osc.stop(); } catch (e) {}
+              try { if (audioCtx) audioCtx.close(); } catch (e) {}
               return;
             }
 
@@ -409,14 +402,13 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
         }, imgB64List);
 
         if (videoBase64) {
-          const match = videoBase64.match(/^data:video\/webm;base64,(.+)$/);
+          const match = videoBase64.match(/^data:video\/[a-zA-Z0-9_-]+;base64,(.+)$/);
           if (match) {
-            const rawWebm = Buffer.from(match[1], 'base64');
-            videoBuffer = await transcodeWebmToMp4(rawWebm);
+            videoBuffer = Buffer.from(match[1], 'base64');
           }
         }
-      } catch (vidErr) {
-        console.warn('Video generation error in serverless:', vidErr);
+      } catch (vidErr: any) {
+        console.warn('Video generation error in serverless:', vidErr.message);
       }
     }
 
@@ -447,46 +439,71 @@ async function sendTelegramMessage(botToken: string, chatId: number | string, me
 }
 
 async function sendTelegramAlbum(botToken: string, chatId: number | string, messageThreadId: number | undefined, buffers: (Buffer | Uint8Array)[], title: string) {
-  const formData = new FormData();
-  formData.append('chat_id', String(chatId));
+  const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
+  const parts: Buffer[] = [];
+
+  parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n${chatId}\r\n`));
   if (messageThreadId) {
-    formData.append('message_thread_id', String(messageThreadId));
+    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="message_thread_id"\r\n\r\n${messageThreadId}\r\n`));
   }
-  formData.append('slide_1', new Blob([buffers[0]], { type: 'image/png' }), 'slide-1.png');
-  formData.append('slide_2', new Blob([buffers[1]], { type: 'image/png' }), 'slide-2.png');
-  formData.append('slide_3', new Blob([buffers[2]], { type: 'image/png' }), 'slide-3.png');
 
   const media = [
     { type: 'photo', media: 'attach://slide_1', caption: `🍳 <b>${title}</b> (3-Slide Carousel Album)`, parse_mode: 'HTML' },
     { type: 'photo', media: 'attach://slide_2' },
     { type: 'photo', media: 'attach://slide_3' }
   ];
-  formData.append('media', JSON.stringify(media));
+  parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="media"\r\n\r\n${JSON.stringify(media)}\r\n`));
+
+  for (let i = 0; i < 3; i++) {
+    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="slide_${i + 1}"; filename="slide-${i + 1}.png"\r\nContent-Type: image/png\r\n\r\n`));
+    parts.push(Buffer.isBuffer(buffers[i]) ? (buffers[i] as Buffer) : Buffer.from(buffers[i]));
+    parts.push(Buffer.from(`\r\n`));
+  }
+  parts.push(Buffer.from(`--${boundary}--\r\n`));
+
+  const body = Buffer.concat(parts);
 
   const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMediaGroup`, {
     method: 'POST',
-    body: formData
+    headers: {
+      'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      'Content-Length': String(body.length)
+    },
+    body
   });
   return await res.json();
 }
 
 async function sendTelegramVideo(botToken: string, chatId: number | string, messageThreadId: number | undefined, videoBuffer: Buffer, title: string) {
-  const formData = new FormData();
-  formData.append('chat_id', String(chatId));
-  if (messageThreadId) {
-    formData.append('message_thread_id', String(messageThreadId));
-  }
+  const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
+  const parts: Buffer[] = [];
   const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  formData.append('video', new Blob([videoBuffer], { type: 'video/mp4' }), `${slug}-shorts.mp4`);
-  formData.append('caption', `🎬 <b>${title}</b>\n\n<i>✨ 60 FPS 9:16 Shorts/TikTok video ready! Tap to save to camera roll & add trending audio in the YouTube/TikTok app.</i>`);
-  formData.append('parse_mode', 'HTML');
-  formData.append('supports_streaming', 'true');
-  formData.append('width', '1080');
-  formData.append('height', '1920');
+
+  parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n${chatId}\r\n`));
+  if (messageThreadId) {
+    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="message_thread_id"\r\n\r\n${messageThreadId}\r\n`));
+  }
+  parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="supports_streaming"\r\n\r\ntrue\r\n`));
+  parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="width"\r\n\r\n1080\r\n`));
+  parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="height"\r\n\r\n1920\r\n`));
+
+  const caption = `🎬 <b>${title}</b>\n\n<i>✨ 9.0s 9:16 Shorts/TikTok video ready! Tap to save to camera roll & add trending audio in the YouTube/TikTok app.</i>`;
+  parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="caption"\r\n\r\n${caption}\r\n`));
+  parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="parse_mode"\r\n\r\nHTML\r\n`));
+
+  parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="video"; filename="${slug}-shorts.mp4"\r\nContent-Type: video/mp4\r\n\r\n`));
+  parts.push(videoBuffer);
+  parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
+
+  const body = Buffer.concat(parts);
 
   const res = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, {
     method: 'POST',
-    body: formData
+    headers: {
+      'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      'Content-Length': String(body.length)
+    },
+    body
   });
   return await res.json();
 }
@@ -532,7 +549,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       botToken,
       chatId,
       messageThreadId,
-      `🎬 <b>Welcome to Slyde Automation Bot!</b>\n\nSend me <b>any recipe URL</b> or use commands:\n\n🎥 <b>/video &lt;url&gt;</b> — 60 FPS 9:16 Video (Ready for YouTube Shorts & TikTok)\n📸 <b>/slides &lt;url&gt;</b> — 3-Slide Carousel Album (Instagram & Threads)\n⚡ <b>/all &lt;url&gt;</b> (or paste any URL) — Both Video + 3 Slides + Caption\n📋 <b>/caption &lt;url&gt;</b> — Viral Social Caption only\n\n<i>💡 Tip: Tap and save the video directly to your phone camera roll to add trending sounds in the YouTube Shorts or TikTok app!</i>`
+      `🎬 <b>Welcome to Slyde Automation Bot!</b>\n\nSend me <b>any recipe URL</b> or use commands:\n\n🎥 <b>/video &lt;url&gt;</b> — 9.0s 9:16 Video (Ready for YouTube Shorts & TikTok)\n📸 <b>/slides &lt;url&gt;</b> — 3-Slide Carousel Album (Instagram & Threads)\n⚡ <b>/all &lt;url&gt;</b> (or paste any URL) — Both Video + 3 Slides + Caption\n📋 <b>/caption &lt;url&gt;</b> — Viral Social Caption only\n\n<i>💡 Tip: Tap and save the video directly to your phone camera roll to add trending sounds in the YouTube Shorts or TikTok app!</i>`
     );
     return res.status(200).send('OK');
   }
@@ -546,7 +563,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const isSlidesOnly = lowerText.startsWith('/slides') || lowerText.startsWith('/carousel') || lowerText.startsWith('/album') || lowerText.startsWith('/s ');
     const isCaptionOnly = lowerText.startsWith('/caption') || lowerText.startsWith('/c ');
 
-    const modeText = isVideoOnly ? '🎬 60 FPS Video' : (isSlidesOnly ? '📸 3 Social Slides' : '⚡ 60 FPS Video + 3 Slides');
+    const modeText = isVideoOnly ? '🎬 9.0s Video' : (isSlidesOnly ? '📸 3 Social Slides' : '⚡ 9.0s Video + 3 Slides');
 
     // Run processing asynchronously with Vercel waitUntil and return 200 OK immediately
     waitUntil((async () => {
@@ -573,17 +590,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const needsVideo = isVideoOnly || !isSlidesOnly;
           const media = await captureMediaServerless(recipe, host, needsVideo);
 
-          // Send 60 FPS Video if requested
+          // Send Video if requested
           if (media.videoBuffer && (isVideoOnly || !isSlidesOnly)) {
-            await sendTelegramVideo(botToken, chatId, messageThreadId, media.videoBuffer, recipe.title);
+            const vidRes = await sendTelegramVideo(botToken, chatId, messageThreadId, media.videoBuffer, recipe.title);
+            if (vidRes && !vidRes.ok) {
+              console.warn('Telegram sendVideo error:', vidRes.description);
+              await sendTelegramMessage(botToken, chatId, messageThreadId, `⚠️ Video delivery note: ${vidRes.description}`);
+            }
           }
 
           // Send 3-slide photo album if requested
           if (media.slides && (isSlidesOnly || !isVideoOnly)) {
-            await sendTelegramAlbum(botToken, chatId, messageThreadId, media.slides, recipe.title);
+            const albumRes = await sendTelegramAlbum(botToken, chatId, messageThreadId, media.slides, recipe.title);
+            if (albumRes && !albumRes.ok) {
+              console.warn('Telegram sendMediaGroup error:', albumRes.description);
+            }
           }
         } catch (renderErr: any) {
           console.warn('Chromium render failed in serverless:', renderErr.message);
+          await sendTelegramMessage(botToken, chatId, messageThreadId, `⚠️ Rendering note: ${renderErr.message}`);
         }
 
         // 4. Send clean viral caption
