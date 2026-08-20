@@ -15,6 +15,39 @@ function decodeEntities(str: string): string {
     .replace(/&#(\d+);/g, (_, c) => String.fromCharCode(Number(c)));
 }
 
+function formatIsoDuration(duration: string): string {
+  if (!duration) return '10m';
+  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/i);
+  if (!match) return duration.replace(/^PT/i, '').toLowerCase() || '10m';
+  const hours = match[1] ? `${match[1]}h ` : '';
+  const mins = match[2] ? `${match[2]}m` : '';
+  return `${hours}${mins}`.trim() || '10m';
+}
+
+function parseServings(rawYield: any): string {
+  if (!rawYield) return '4';
+  if (Array.isArray(rawYield)) {
+    for (const item of rawYield) {
+      const parsed = parseServings(item);
+      if (parsed && parsed !== '4') return parsed;
+    }
+    if (rawYield.length > 0) return parseServings(rawYield[0]);
+  }
+  const str = String(rawYield).trim();
+  const rangeMatch = str.match(/(\d+)\s*(?:to|-)\s*(\d+)/i);
+  if (rangeMatch) return `${rangeMatch[1]}-${rangeMatch[2]}`;
+  const numMatch = str.match(/(\d+)/);
+  if (numMatch) return numMatch[1];
+  return '4';
+}
+
+function cleanCalories(rawCal: any): string {
+  if (!rawCal) return '320 cal';
+  const str = String(rawCal);
+  const numMatch = str.match(/(\d+)/);
+  return numMatch ? `${numMatch[1]} cal` : '320 cal';
+}
+
 // Serverless Recipe Extractor
 async function extractRecipeServer(recipeUrl: string) {
   let html = '';
@@ -62,10 +95,10 @@ async function extractRecipeServer(recipeUrl: string) {
   }
 
   const title = decodeEntities(recipeObj?.name || 'Delicious Recipe').trim();
-  const prepTime = recipeObj?.prepTime || '10m';
-  const cookTime = recipeObj?.cookTime || '15m';
-  const servings = recipeObj?.recipeYield ? String(recipeObj.recipeYield).replace(/\D+/g, '') : '4';
-  const calories = recipeObj?.nutrition?.calories ? `${recipeObj.nutrition.calories} cal` : '320 cal';
+  const prepTime = formatIsoDuration(recipeObj?.prepTime || '10m');
+  const cookTime = formatIsoDuration(recipeObj?.cookTime || '15m');
+  const servings = parseServings(recipeObj?.recipeYield);
+  const calories = cleanCalories(recipeObj?.nutrition?.calories);
 
   const rawIngredients = Array.isArray(recipeObj?.recipeIngredient) ? recipeObj.recipeIngredient : [];
   const ingredients = rawIngredients.slice(0, 12).map((i: string) => {
@@ -96,7 +129,7 @@ async function extractRecipeServer(recipeUrl: string) {
   }
 
   const brandName = process.env.BRAND_NAME || 'SnapRecipes';
-  const ctaUrl = process.env.CTA_URL || 'snaprecipes.xyz';
+  const ctaUrl = process.env.CTA_URL || 'https://snaprecipes.xyz';
 
   return {
     id: 'recipe-' + Date.now(),
@@ -128,29 +161,32 @@ async function extractRecipeServer(recipeUrl: string) {
 async function generateGeminiCaptionServer(recipeData: any) {
   const geminiKey = process.env.GEMINI_API_KEY || '';
   const brandName = process.env.BRAND_NAME || 'SnapRecipes';
-  const ctaUrl = process.env.CTA_URL || 'snaprecipes.xyz';
+  const ctaUrl = process.env.CTA_URL || 'https://snaprecipes.xyz';
   const brandTag = brandName.replace(/\s+/g, '');
 
   let hook = `Better than takeout and ready in ${recipeData.cookTime || recipeData.prepTime}. ${recipeData.ingredients.length} ingredients, ${recipeData.method.length} steps. 🍽️`;
 
   if (geminiKey) {
     try {
-      const prompt = `Write a punchy, viral 1-sentence social media hook for this recipe: "${recipeData.title}".
-Mention time (${recipeData.cookTime || recipeData.prepTime}), ${recipeData.ingredients.length} ingredients, and ${recipeData.method.length} steps.
-Example: "Better than takeout and ready in 30 minutes. 7 ingredients, 5 steps, 30 min. 🍽️"
-Return ONLY the 1-sentence hook ending with 🍽️.`;
+      const prompt = `You are a social media chef writing an appetizing 1-sentence viral hook for this recipe: "${recipeData.title}".
+Instructions:
+- Write ONE complete, punchy sentence describing why this dish is delicious and easy.
+- Must end with a period and 🍽️.
+- DO NOT end mid-sentence or with a preposition (like "in", "with", "and").
+- Example: "Layers of creamy vanilla pudding and chocolate make this no-bake dessert an instant crowd favorite. 🍽️"
+Return ONLY the one complete sentence.`;
 
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 300 }
+          generationConfig: { temperature: 0.7, maxOutputTokens: 250 }
         })
       });
       const d = await res.json();
       const txt = d.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      if (txt && txt.length > 8) {
+      if (txt && txt.length > 15 && !txt.endsWith(' in') && !txt.endsWith(' with') && !txt.endsWith(' and')) {
         hook = txt.replace(/^["']|["']$/g, '').trim();
       }
     } catch (e: any) {}
@@ -158,7 +194,9 @@ Return ONLY the 1-sentence hook ending with 🍽️.`;
 
   const ingList = recipeData.ingredients.map((i: any) => `- ${i.name}${i.amount ? ' (' + i.amount + ')' : ''}`).join('\n');
   const stepsList = recipeData.method.map((s: string, idx: number) => `${idx + 1}. ${s}`).join('\n');
-  const firstWord = recipeData.title.split(' ')[0].replace(/[^a-zA-Z]/g, '');
+  const firstWord = recipeData.title.split(' ')[0]
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]/g, '') || 'Recipe';
 
   return `${recipeData.title} — ${hook}
 
@@ -168,7 +206,7 @@ ${ingList}
 How to:
 ${stepsList}
 
-Prep ${recipeData.prepTime} · Cook ${recipeData.cookTime} · Makes ${recipeData.servings} · cal ${recipeData.calories || '≈340 cal'}
+Prep ${recipeData.prepTime} · Cook ${recipeData.cookTime} · Makes ${recipeData.servings} · ${recipeData.calories}
 
 Save this recipe on ${brandName} — skip the life story, get straight to cooking. Get the app: ${ctaUrl}
 
@@ -193,7 +231,8 @@ async function captureSlidesServerless(recipe: any, host: string) {
 
   try {
     const page = await browser.newPage();
-    const renderUrl = host.includes('localhost') ? `http://${host}/render.html` : `https://${host}/render.html`;
+    const cleanHost = host.replace(/^https?:\/\//, '');
+    const renderUrl = cleanHost.includes('localhost') ? `http://${cleanHost}/render.html` : `https://${cleanHost}/render.html`;
     await page.goto(renderUrl, { waitUntil: 'networkidle0', timeout: 18000 });
 
     await page.evaluate((r) => {
@@ -304,7 +343,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await sendTelegramMessage(botToken, chatId, messageThreadId, '👨‍🍳 <b>Extracting recipe & rendering 3 social slides...</b>');
 
     try {
-      const host = req.headers.host || 'slyde-bay.vercel.app';
+      const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'slyde-bay.vercel.app';
       const recipe = await extractRecipeServer(recipeUrl);
 
       // 2. Render all 3 slides using Chromium & send photo album
