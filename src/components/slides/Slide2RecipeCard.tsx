@@ -52,9 +52,9 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
   }
 
   // Smooth Proportional Auto-Fit Font Scaling
-  let autoFontScale = config.fontScale || 1.0;
-  if (config.fontScale) {
-    autoFontScale = config.fontScale;
+  let autoFontScale = 1.0;
+  if (recipe.slide2Config?.fontScale && recipe.slide2Config.fontScale !== 1.0) {
+    autoFontScale = recipe.slide2Config.fontScale;
   } else if (contentScore > 500) {
     autoFontScale = 0.58;
   } else if (contentScore > 400) {
