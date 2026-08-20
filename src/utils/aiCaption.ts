@@ -37,7 +37,7 @@ export const DEFAULT_AI_CONFIG: AIConfig = {
   geminiApiKey: '',
   geminiModel: 'gemini-2.5-flash',
   openRouterApiKey: '',
-  openRouterModel: 'meta-llama/llama-3.3-70b-instruct'
+  openRouterModel: 'openrouter/auto'
 };
 
 export function getStoredAIConfig(): AIConfig {
@@ -49,7 +49,6 @@ export function getStoredAIConfig(): AIConfig {
     }
   } catch (e) {}
 
-  // Backwards compatibility with old gemini key
   const oldGeminiKey = localStorage.getItem('slyde_gemini_api_key') || '';
   return {
     ...DEFAULT_AI_CONFIG,
@@ -72,6 +71,7 @@ export function saveStoredAIConfig(config: AIConfig): void {
 function toTitleCase(str: string): string {
   const minorWords = new Set(['and', 'with', 'in', 'on', 'at', 'to', 'for', 'a', 'an', 'the', 'of', 'or', '&']);
   return str
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .split(' ')
     .map((word, index) => {
@@ -82,14 +82,47 @@ function toTitleCase(str: string): string {
     .join(' ');
 }
 
+function cleanCalories(rawCal: any): string {
+  if (!rawCal || rawCal === 'N/A') return 'cal 320';
+  const str = String(rawCal).trim();
+  const numMatch = str.match(/(\d+)/);
+  return numMatch ? `cal ${numMatch[1]}` : 'cal 320';
+}
+
 function cleanTeaser(raw: string): string {
   let str = (raw || '').trim();
+
+  // 1. Strip reasoning tags (<think>...</think>)
+  str = str.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+  // 2. Strip code fences & quotes
+  str = str.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+  str = str.replace(/^["']|["']$/g, '').trim();
+
+  // 3. Detect and discard raw reasoning dumps or prompt echoes
+  const isMetaDump = 
+    /^(?:we need to|i need to|let's count|so something like|teaser:|note:|json|here is|here's|respond with|the user)/i.test(str) ||
+    str.toLowerCase().includes('count words') ||
+    str.toLowerCase().includes('raw json') ||
+    str.toLowerCase().includes('punchy viral sentence') ||
+    str.toLowerCase().includes('no ingredient counts') ||
+    str.length > 220;
+
+  if (isMetaDump) {
+    return 'Better than takeout and ready in minutes.';
+  }
+
+  // 4. Strip trailing stats like '10 ingredients, 5 steps...' if present
   str = str.replace(/,?\s*\d+\s*ingredients.*$/i, '').trim();
+  // Strip emojis without removing words
   str = str.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}]/gu, '').trim();
+  // Remove dangling punctuation at end
   str = str.replace(/[,\s—\-_;:]+$/, '').trim();
+
   if (str && !str.endsWith('.') && !str.endsWith('!')) {
     str += '.';
   }
+
   return str || 'Better than takeout and ready in minutes.';
 }
 
@@ -100,7 +133,11 @@ export function generateRelevantHashtags(recipe: RecipeData, aiTags?: string[]):
 
   if (Array.isArray(aiTags) && aiTags.length > 0) {
     aiTags.forEach(t => {
-      const clean = t.replace(/^#+/, '').replace(/[^a-zA-Z0-9]/g, '').trim();
+      const clean = t
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/^#+/, '')
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .trim();
       if (clean && clean.length > 1) {
         tags.add(`#${clean}`);
       }
@@ -108,35 +145,57 @@ export function generateRelevantHashtags(recipe: RecipeData, aiTags?: string[]):
     return Array.from(tags).slice(0, 7).join(' ');
   }
 
+  // Stop words for ingredients (measurement units, preparation words)
+  const stopWords = new Set([
+    'fresh', 'cup', 'cups', 'tbsp', 'tablespoon', 'tablespoons', 'tsp', 'teaspoon', 'teaspoons',
+    'package', 'packages', 'pkg', 'pkgs', 'container', 'containers', 'instant', 'prepared',
+    'frozen', 'thawed', 'large', 'small', 'medium', 'clove', 'cloves', 'ounce', 'ounces', 'oz',
+    'pound', 'pounds', 'lb', 'lbs', 'gram', 'grams', 'slice', 'slices', 'can', 'cans', 'diced',
+    'chopped', 'minced', 'melted', 'crushed', 'warm', 'cold', 'hot', 'divided', 'optional',
+    'taste', 'pinch', 'dash', 'all', 'purpose', 'extra', 'virgin', 'dry', 'white', 'black', 'water',
+    'square', 'squares', 'and', 'with', 'the', 'for', 'from', 'style'
+  ]);
+
   const cleanTitleWords = recipe.title
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-zA-Z0-9\s]/g, '')
     .split(/\s+/)
-    .filter(w => w.length > 2 && !['and', 'with', 'the', 'for', 'from', 'style'].includes(w.toLowerCase()));
+    .filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()));
 
+  // 1. Full Dish Tag (e.g. #EclairCake, #LemonLush)
   const fullDish = cleanTitleWords.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('');
-  if (fullDish.length < 25) {
+  if (fullDish.length < 25 && fullDish.length > 2) {
     tags.add(`#${fullDish}`);
   }
 
+  // 2. Individual key words from title (e.g. #Eclair, #Cake)
   cleanTitleWords.forEach(w => {
     tags.add(`#${w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()}`);
   });
 
+  // 3. Prominent food ingredients (ignoring measurement units)
   if (recipe.ingredients && recipe.ingredients.length > 0) {
-    recipe.ingredients.slice(0, 3).forEach(ing => {
-      const mainWord = ing.name.replace(/[^a-zA-Z\s]/g, '').split(/\s+/).find(w => w.length > 3 && !['fresh', 'cup', 'tbsp', 'package', 'large', 'small', 'cloves'].includes(w.toLowerCase()));
-      if (mainWord) {
+    recipe.ingredients.slice(0, 4).forEach(ing => {
+      const words = ing.name
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z\s]/g, '')
+        .split(/\s+/)
+        .filter(w => w.length > 3 && !stopWords.has(w.toLowerCase()));
+
+      if (words.length > 0) {
+        const mainWord = words[0];
         tags.add(`#${mainWord.charAt(0).toUpperCase() + mainWord.slice(1).toLowerCase()}`);
       }
     });
   }
 
+  // 4. Meal & Category Tag
   const titleLower = recipe.title.toLowerCase();
   if (titleLower.includes('salad')) tags.add('#SaladRecipe');
   if (titleLower.includes('nacho') || titleLower.includes('dip') || titleLower.includes('bite') || titleLower.includes('wing')) tags.add('#Appetizers');
   if (titleLower.includes('pasta') || titleLower.includes('noodle')) tags.add('#PastaNight');
   if (titleLower.includes('soup') || titleLower.includes('chili') || titleLower.includes('stew')) tags.add('#CozyFood');
-  if (titleLower.includes('cake') || titleLower.includes('cookie') || titleLower.includes('pudding') || titleLower.includes('dessert') || titleLower.includes('brownie')) tags.add('#DessertRecipes');
+  if (titleLower.includes('cake') || titleLower.includes('cookie') || titleLower.includes('pudding') || titleLower.includes('dessert') || titleLower.includes('brownie') || titleLower.includes('eclair') || titleLower.includes('éclair')) tags.add('#DessertRecipes');
   if (titleLower.includes('steak') || titleLower.includes('chicken') || titleLower.includes('salmon') || titleLower.includes('beef') || titleLower.includes('pork')) tags.add('#DinnerIdeas');
 
   tags.add('#EasyRecipes');
@@ -195,13 +254,13 @@ export async function testGeminiApiKey(apiKey: string, model: string = 'gemini-2
 /**
  * Verify OpenRouter API Key
  */
-export async function testOpenRouterApiKey(apiKey: string, model: string = 'meta-llama/llama-3.3-70b-instruct'): Promise<AITestResult> {
+export async function testOpenRouterApiKey(apiKey: string, model: string = 'openrouter/auto'): Promise<AITestResult> {
   const cleanKey = apiKey.trim();
   if (!cleanKey) {
     return { success: false, message: 'Please enter an OpenRouter API Key.' };
   }
 
-  const modelToUse = model || 'meta-llama/llama-3.3-70b-instruct';
+  const modelToUse = model || 'openrouter/auto';
 
   try {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://slyde-bay.vercel.app';
@@ -277,7 +336,7 @@ ${ingredientsList}
 How to:
 ${stepsList}
 
-Prep ${recipe.prepTime} · Cook ${recipe.cookTime} · Makes ${recipe.servings} · cal ${recipe.calories || 'N/A'}
+Prep ${recipe.prepTime} · Cook ${recipe.cookTime} · Makes ${recipe.servings} · ${cleanCalories(recipe.calories)}
 
 Save this recipe on ${brandName} — skip the life story, get straight to cooking. Get the app: ${ctaUrl}
 
@@ -320,24 +379,18 @@ export function generateLocalSocialCaption(recipe: RecipeData, mode: 'long' | 's
 async function generateWithOpenRouter(
   recipe: RecipeData,
   apiKey: string,
-  model: string = 'meta-llama/llama-3.3-70b-instruct'
+  model: string = 'openrouter/auto'
 ): Promise<{ hook?: string; hashtags: string[] }> {
   try {
     const ingList = recipe.ingredients.slice(0, 6).map(i => i.name).join(', ');
-    const prompt = `Generate social media caption content for this recipe:
-Recipe Title: "${recipe.title}"
-Key Ingredients: ${ingList}
+    const prompt = `You are a social media chef writing a viral 1-sentence teaser (8-14 words) for this recipe: "${recipe.title}".
+Ingredients: ${ingList}
 Time: ${recipe.cookTime || recipe.prepTime || '30m'}
 
-Respond with ONLY a raw JSON object with these exact keys:
-{
-  "teaser": "1 punchy viral sentence (8-14 words) about taste, speed, or texture.",
-  "hashtags": ["#SnapRecipes", "#SpecificDishName", "#KeyIngredient", "#MealCategory", "#CookingStyle", "#EasyRecipes"]
-}
-
-Guidelines:
-- "teaser" MUST be a complete grammatical sentence. Do not mention ingredient counts, step numbers, or emojis.
-- "hashtags" MUST be 5-6 highly relevant, specific hashtags tailored to this exact recipe.`;
+You MUST output ONLY a valid JSON object with {"teaser": "...", "hashtags": [...]}.
+Do NOT output any chain-of-thought, reasoning, words counting, or explanations.
+Example output:
+{"teaser": "Layers of creamy vanilla pudding and chocolate make this no-bake dessert an instant crowd favorite.", "hashtags": ["#EclairCake", "#NoBakeDessert", "#DessertRecipes"]}`;
 
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://slyde-bay.vercel.app';
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -349,31 +402,41 @@ Guidelines:
         'X-Title': 'Slyde Carousel Studio'
       },
       body: JSON.stringify({
-        model: model || 'meta-llama/llama-3.3-70b-instruct',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 300
+        model: model || 'openrouter/auto',
+        messages: [
+          { role: 'system', content: 'You are an AI chef that outputs ONLY raw JSON objects with {"teaser": "...", "hashtags": [...]}. Never output thinking or preambles.' },
+          { role: 'user', content: prompt }
+        ],
+        max_tokens: 250
       })
     });
 
     if (res.ok) {
       const data = await res.json();
       let rawText = data.choices?.[0]?.message?.content?.trim() || data.choices?.[0]?.text?.trim() || '';
-      // Strip markdown code fences if model returned ```json ... ```
+      // Strip <think>...</think>
+      rawText = rawText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+      // Strip markdown code fences
       rawText = rawText.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
 
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      const jsonMatch = rawText.match(/\{[\s\S]*?\}/);
       if (jsonMatch) {
         try {
           const parsed = JSON.parse(jsonMatch[0]);
-          return {
-            hook: parsed.teaser,
-            hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags : []
-          };
+          const teaser = typeof parsed.teaser === 'string' ? cleanTeaser(parsed.teaser) : '';
+          const hashtags = Array.isArray(parsed.hashtags) ? parsed.hashtags : [];
+          if (teaser) {
+            return {
+              hook: teaser,
+              hashtags
+            };
+          }
         } catch (e) {}
       }
 
-      if (rawText && rawText.length > 5) {
-        return { hook: rawText.replace(/^["']|["']$/g, '').trim(), hashtags: [] };
+      const clean = cleanTeaser(rawText);
+      if (clean) {
+        return { hook: clean, hashtags: [] };
       }
     }
   } catch (e) {
@@ -428,12 +491,14 @@ Guidelines:
       if (rawText) {
         try {
           const parsed = JSON.parse(rawText);
+          const teaser = typeof parsed.teaser === 'string' ? cleanTeaser(parsed.teaser) : '';
           return {
-            hook: parsed.teaser,
+            hook: teaser,
             hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags : []
           };
         } catch (e) {
-          return { hook: rawText.replace(/^["']|["']$/g, '').trim(), hashtags: [] };
+          const clean = cleanTeaser(rawText);
+          return { hook: clean, hashtags: [] };
         }
       }
     }
