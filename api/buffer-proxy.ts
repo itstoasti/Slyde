@@ -374,10 +374,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           // Attach assets: Video for YouTube, Images for Instagram/Threads/TikTok
           if (isYouTube) {
-            const ytVideo = videoUrl || resolvedVideoUrl;
+            const ytVideo = resolvedVideoUrl || (videoUrl && typeof videoUrl === 'string' && videoUrl.startsWith('http') ? videoUrl : null);
             if (ytVideo) {
               input.assets = [{ video: { url: ytVideo } }];
             } else {
+              console.warn('[buffer-proxy] YouTube target missing video URL. resolvedVideoUrl:', resolvedVideoUrl, 'videoUrl:', videoUrl ? `${videoUrl.substring(0, 50)}...` : 'NONE');
               delete input.assets;
             }
           } else if (commonAssets && commonAssets.length > 0) {
