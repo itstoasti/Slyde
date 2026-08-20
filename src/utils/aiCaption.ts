@@ -13,13 +13,16 @@ export interface DualSocialCaptions {
 }
 
 export const OPENROUTER_MODELS = [
+  { id: 'openrouter/auto', name: '⚡ OpenRouter Auto (Smart Router)' },
   { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B (Fast & Cheap)' },
   { id: 'anthropic/claude-3.5-haiku', name: 'Claude 3.5 Haiku (High Quality)' },
   { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini (Popular & Fast)' },
-  { id: 'google/gemini-2.0-flash-001', name: 'Gemini 2.0 Flash via OpenRouter' },
-  { id: 'deepseek/deepseek-chat', name: 'DeepSeek V3 (Very Cheap)' },
+  { id: 'google/gemini-2.0-flash-001', name: 'Gemini 2.0 Flash' },
+  { id: 'deepseek/deepseek-chat', name: 'DeepSeek V3' },
+  { id: 'meta-llama/llama-3.3-70b-instruct:free', name: '🎁 Llama 3.3 70B (Free Tier)' },
+  { id: 'qwen/qwen-2.5-coder-32b-instruct:free', name: '🎁 Qwen 2.5 32B (Free Tier)' },
   { id: 'mistralai/mistral-small-24b-instruct-2501', name: 'Mistral Small 24B' },
-  { id: 'custom', name: 'Custom Model ID...' }
+  { id: 'custom', name: '✏️ Custom Model ID...' }
 ];
 
 export const GEMINI_MODELS = [

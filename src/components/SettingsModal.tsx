@@ -591,6 +591,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="form-group">
                     <label className="form-label">
                       <span>OpenRouter Model</span>
+                      {aiConfig.openRouterModel && (
+                        <span style={{ fontSize: '0.72rem', color: 'var(--app-primary)', fontFamily: 'monospace' }}>
+                          Active: {aiConfig.openRouterModel}
+                        </span>
+                      )}
                     </label>
                     <select
                       className="form-select"
@@ -598,29 +603,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       onChange={(e) => {
                         const val = e.target.value;
                         if (val === 'custom') {
-                          setAiConfig({ ...aiConfig, openRouterModel: 'custom' });
+                          setAiConfig({ ...aiConfig, openRouterModel: customOpenRouterModel.trim() || 'custom' });
                         } else {
                           setAiConfig({ ...aiConfig, openRouterModel: val });
                         }
                       }}
                     >
                       {OPENROUTER_MODELS.map(m => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
+                        <option key={m.id} value={m.id}>
+                          {m.id === 'custom' && customOpenRouterModel ? `✏️ Custom (${customOpenRouterModel})` : m.name}
+                        </option>
                       ))}
                     </select>
                   </div>
 
-                  {aiConfig.openRouterModel === 'custom' && (
+                  {(!OPENROUTER_MODELS.some(m => m.id === aiConfig.openRouterModel && m.id !== 'custom') || aiConfig.openRouterModel === 'custom') && (
                     <div className="form-group">
                       <label className="form-label">
-                        <span>Custom Model ID</span>
+                        <span>Custom Model ID (e.g. openrouter/free, qwen/qwen-2.5-72b-instruct)</span>
                       </label>
                       <input
                         type="text"
                         className="form-input"
-                        placeholder="e.g. qwen/qwen-2.5-72b-instruct"
+                        placeholder="e.g. openrouter/free or meta-llama/llama-3.3-70b-instruct:free"
                         value={customOpenRouterModel}
-                        onChange={(e) => setCustomOpenRouterModel(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCustomOpenRouterModel(val);
+                          setAiConfig({ ...aiConfig, openRouterModel: val.trim() || 'custom' });
+                        }}
                       />
                     </div>
                   )}
