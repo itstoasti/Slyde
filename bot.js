@@ -367,6 +367,113 @@ async function captureSlidesWithPuppeteer(recipe) {
   }
 }
 
+/**
+ * Generate 60 FPS 9:16 Vertical Video from the 3 High-Res Slide Buffers
+ */
+async function generateVideoFromSlides(buf1, buf2, buf3) {
+  const browser = await puppeteer.launch({
+    executablePath: CHROME_PATH,
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
+  });
+
+  try {
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1080, height: 1920 });
+
+    const imgB64List = [buf1.toString('base64'), buf2.toString('base64'), buf3.toString('base64')];
+
+    const videoBase64 = await page.evaluate(async (b64Images) => {
+      const images = await Promise.all(b64Images.map(src => new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.src = 'data:image/png;base64,' + src;
+      })));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 1080;
+      canvas.height = 1920;
+      document.body.appendChild(canvas);
+      const ctx = canvas.getContext('2d', { alpha: false });
+
+      const fps = 60;
+      const durations = [2.0, 3.5, 1.5]; // 7.0s total pacing
+      const slideFrameCounts = durations.map(d => Math.round(d * fps));
+      const slideStartFrames = [0];
+      for (let i = 0; i < durations.length; i++) {
+        slideStartFrames.push(slideStartFrames[i] + slideFrameCounts[i]);
+      }
+      const totalFrames = slideStartFrames[durations.length];
+      const transitionFrames = Math.round(fps * 0.35); // 0.35s transition
+
+      const stream = canvas.captureStream(fps);
+      const recorder = new MediaRecorder(stream, {
+        mimeType: 'video/webm',
+        videoBitsPerSecond: 6000000
+      });
+      const chunks = [];
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+      const done = new Promise(resolve => {
+        recorder.onstop = () => {
+          const blob = new Blob(chunks, { type: 'video/webm' });
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        };
+      });
+
+      recorder.start();
+
+      let frame = 0;
+      const interval = setInterval(() => {
+        if (frame >= totalFrames) {
+          clearInterval(interval);
+          recorder.stop();
+          return;
+        }
+
+        let curIdx = 0;
+        for (let i = 0; i < images.length; i++) {
+          if (frame >= slideStartFrames[i] && frame < slideStartFrames[i + 1]) {
+            curIdx = i;
+            break;
+          }
+        }
+
+        const frameInSlide = frame - slideStartFrames[curIdx];
+        const curDuration = slideFrameCounts[curIdx];
+        const nextIdx = (curIdx + 1) % images.length;
+        const curImg = images[curIdx];
+        const nextImg = images[nextIdx];
+
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, 1080, 1920);
+
+        const transStart = curDuration - transitionFrames;
+        if (frameInSlide >= transStart) {
+          const progress = (frameInSlide - transStart) / transitionFrames;
+          const ease = 1 - Math.pow(1 - progress, 3);
+          const offsetX = ease * 1080;
+          ctx.drawImage(curImg, -offsetX, 0, 1080, 1920);
+          ctx.drawImage(nextImg, 1080 - offsetX, 0, 1080, 1920);
+        } else {
+          ctx.drawImage(curImg, 0, 0, 1080, 1920);
+        }
+
+        frame++;
+      }, 1000 / fps);
+
+      return done;
+    }, imgB64List);
+
+    const match = videoBase64.match(/^data:video\/webm;base64,(.+)$/);
+    return Buffer.from(match[1], 'base64');
+  } finally {
+    await browser.close();
+  }
+}
+
 let lastOffset = 0;
 
 async function pollUpdates() {
@@ -401,7 +508,7 @@ async function pollUpdates() {
             body: JSON.stringify({
               chat_id: chatId,
               ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
-              text: `👋 <b>Welcome to Slyde Bot!</b>\n\nSend me <b>any recipe URL</b> (from AllRecipes, NYT Cooking, food blogs) and I will automatically reply with:\n\n1️⃣ <b>Full 3-Slide Carousel Album</b> (Hook, Recipe Card, CTA)\n2️⃣ <b>Viral Social Caption</b> with ingredients, steps, and hashtags!\n\n<i>Powered by Slyde Carousel Studio.</i>`,
+              text: `🎬 <b>Welcome to Slyde Automation Bot!</b>\n\nSend me <b>any recipe URL</b> or use commands:\n\n🎥 <b>/video &lt;url&gt;</b> — 60 FPS 9:16 Video (Ready for YouTube Shorts & TikTok)\n📸 <b>/slides &lt;url&gt;</b> — 3-Slide Carousel Album (Instagram & Threads)\n⚡ <b>/all &lt;url&gt;</b> (or paste any URL) — Both Video + 3 Slides + Caption\n📋 <b>/caption &lt;url&gt;</b> — Viral Social Caption only\n\n<i>💡 Tip: Tap and save the video directly to your phone camera roll to add trending sounds in the YouTube Shorts or TikTok app!</i>`,
               parse_mode: 'HTML'
             })
           });
@@ -411,7 +518,14 @@ async function pollUpdates() {
         const urlMatch = text.match(/https?:\/\/[^\s]+/i);
         if (urlMatch) {
           const recipeUrl = urlMatch[0];
-          console.log('\x1b[32m%s\x1b[0m', `👨‍🍳 [Slyde 24/7 Bot] Processing recipe URL from @${user}: ${recipeUrl}`);
+          const lowerText = text.toLowerCase().trim();
+
+          const isVideoOnly = lowerText.startsWith('/video') || lowerText.startsWith('/short') || lowerText.startsWith('/reel') || lowerText.startsWith('/v ');
+          const isSlidesOnly = lowerText.startsWith('/slides') || lowerText.startsWith('/carousel') || lowerText.startsWith('/album') || lowerText.startsWith('/s ');
+          const isCaptionOnly = lowerText.startsWith('/caption') || lowerText.startsWith('/c ');
+
+          const modeText = isVideoOnly ? '🎬 60 FPS Video' : (isSlidesOnly ? '📸 3 Social Slides' : '⚡ 60 FPS Video + 3 Slides');
+          console.log('\x1b[32m%s\x1b[0m', `👨‍🍳 [Slyde Bot] Processing [${modeText}] from @${user}: ${recipeUrl}`);
 
           // 1. Send immediate progress acknowledgment
           await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -420,7 +534,7 @@ async function pollUpdates() {
             body: JSON.stringify({
               chat_id: chatId,
               ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
-              text: `👨‍🍳 <b>Extracting recipe & rendering 3 social slides...</b>`,
+              text: `👨‍🍳 <b>Extracting recipe & generating ${modeText}...</b>`,
               parse_mode: 'HTML'
             })
           });
@@ -430,38 +544,77 @@ async function pollUpdates() {
             const recipe = await extractRecipe(recipeUrl, branding);
             saveRecipeToQueue(recipe);
 
+            // Generate viral social caption
+            const caption = await generateSocialCaption(recipe);
+
+            if (isCaptionOnly) {
+              await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chat_id: chatId,
+                  ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
+                  text: caption
+                })
+              });
+              continue;
+            }
+
             // 2. Render all 3 slides using Headless Chrome (Exact React DOM fidelity)
-            console.log('\x1b[35m%s\x1b[0m', `📸 [Slyde 24/7 Bot] Rendering exact React slides for "${recipe.title}"...`);
+            console.log('\x1b[35m%s\x1b[0m', `📸 [Slyde Bot] Rendering exact React slides for "${recipe.title}"...`);
             const [buf1, buf2, buf3] = await captureSlidesWithPuppeteer(recipe);
 
-            // 3. Send 3-slide photo album to Telegram
-            const formData = new FormData();
-            formData.append('chat_id', chatId);
-            if (messageThreadId) {
-              formData.append('message_thread_id', String(messageThreadId));
+            // If video requested or full mode (/all or raw link), render 60 FPS video
+            if (isVideoOnly || !isSlidesOnly) {
+              console.log('\x1b[36m%s\x1b[0m', `🎬 [Slyde Bot] Rendering 60 FPS HD 9:16 video for "${recipe.title}"...`);
+              const videoBuf = await generateVideoFromSlides(buf1, buf2, buf3);
+
+              const videoForm = new FormData();
+              videoForm.append('chat_id', chatId);
+              if (messageThreadId) {
+                videoForm.append('message_thread_id', String(messageThreadId));
+              }
+              const slug = recipe.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+              videoForm.append('video', new Blob([videoBuf], { type: 'video/mp4' }), `${slug}-shorts.mp4`);
+              videoForm.append('caption', `🎬 <b>${recipe.title}</b>\n\n<i>✨ 60 FPS 9:16 Shorts/TikTok video ready! Save to camera roll & add trending audio.</i>`);
+              videoForm.append('parse_mode', 'HTML');
+              videoForm.append('supports_streaming', 'true');
+              videoForm.append('width', '1080');
+              videoForm.append('height', '1920');
+
+              await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVideo`, {
+                method: 'POST',
+                body: videoForm
+              });
+              console.log('\x1b[32m%s\x1b[0m', `🎥 [Slyde Bot] Delivered 60 FPS video to @${user}!`);
             }
-            formData.append('slide_1', new Blob([buf1], { type: 'image/png' }), 'slide-1.png');
-            formData.append('slide_2', new Blob([buf2], { type: 'image/png' }), 'slide-2.png');
-            formData.append('slide_3', new Blob([buf3], { type: 'image/png' }), 'slide-3.png');
 
-            const media = [
-              { type: 'photo', media: 'attach://slide_1', caption: `🍳 <b>${recipe.title}</b>`, parse_mode: 'HTML' },
-              { type: 'photo', media: 'attach://slide_2' },
-              { type: 'photo', media: 'attach://slide_3' }
-            ];
-            formData.append('media', JSON.stringify(media));
+            // If slides requested or full mode (/all or raw link), send 3-slide photo album
+            if (isSlidesOnly || !isVideoOnly) {
+              const formData = new FormData();
+              formData.append('chat_id', chatId);
+              if (messageThreadId) {
+                formData.append('message_thread_id', String(messageThreadId));
+              }
+              formData.append('slide_1', new Blob([buf1], { type: 'image/png' }), 'slide-1.png');
+              formData.append('slide_2', new Blob([buf2], { type: 'image/png' }), 'slide-2.png');
+              formData.append('slide_3', new Blob([buf3], { type: 'image/png' }), 'slide-3.png');
 
-            const sendRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup`, {
-              method: 'POST',
-              body: formData
-            });
-            const sendData = await sendRes.json();
-            if (!sendData.ok) {
-              console.warn('sendMediaGroup warning:', sendData.description);
+              const media = [
+                { type: 'photo', media: 'attach://slide_1', caption: `🍳 <b>${recipe.title}</b> (3-Slide Carousel Album)`, parse_mode: 'HTML' },
+                { type: 'photo', media: 'attach://slide_2' },
+                { type: 'photo', media: 'attach://slide_3' }
+              ];
+              formData.append('media', JSON.stringify(media));
+
+              await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup`, {
+                method: 'POST',
+                body: formData
+              });
+              console.log('\x1b[32m%s\x1b[0m', `📸 [Slyde Bot] Delivered 3-slide album to @${user}!`);
             }
 
-            // 4. Generate and send full viral social caption
-            const caption = await generateSocialCaption(recipe);
+            // Send viral caption text
             await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -472,7 +625,7 @@ async function pollUpdates() {
               })
             });
 
-            console.log('\x1b[32m%s\x1b[0m', `✨ [Slyde 24/7 Bot] Successfully delivered 3 slides + caption to @${user}!`);
+            console.log('\x1b[32m%s\x1b[0m', `✨ [Slyde Bot] Complete delivery finished for @${user}!`);
           } catch (err) {
             console.error('Error processing recipe in bot:', err);
             await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -481,7 +634,7 @@ async function pollUpdates() {
               body: JSON.stringify({
                 chat_id: chatId,
                 ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
-                text: `⚠️ Error generating slides: ${err.message}`
+                text: `⚠️ Error generating media: ${err.message}`
               })
             });
           }
