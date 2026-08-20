@@ -114,18 +114,23 @@ export async function downloadAllSlidesZip(
 }
 
 /**
- * Create a video slideshow (WebM/MP4) matching the exact phone bezel preview
+ * Create a video slideshow (WebM/MP4) matching YouTube Shorts & mobile specifications
+ * - 60 FPS buttery smooth transitions
+ * - 16 Mbps high bitrate for crisp text and vivid food textures
+ * - Dynamic pacing (Hook 2.5s -> Recipe 5.0s -> CTA 1.5s = 9.0s total)
+ * - Seamless loop (Slide 3 transitions back into Slide 1 at the end)
  */
 export async function createSlideshowVideo(
   slideElements: HTMLElement[],
-  slideDurationSec: number = 3.5,
+  slideDurations: number | number[] = [2.5, 5.0, 1.5],
   onProgress?: (percent: number) => void
 ): Promise<Blob> {
-  // Capture all slides as Image objects first with high pixelRatio for true HD
+  const numSlides = slideElements.length;
+  // Capture all slides as Image objects first with 3.0 pixelRatio for true HD
   const images: HTMLImageElement[] = [];
-  for (let i = 0; i < slideElements.length; i++) {
-    onProgress?.(Math.round(((i + 1) / slideElements.length) * 40));
-    const dataUrl = await toPng(slideElements[i], { pixelRatio: 2.5, cacheBust: false, skipFonts: true });
+  for (let i = 0; i < numSlides; i++) {
+    onProgress?.(Math.round(((i + 1) / numSlides) * 35));
+    const dataUrl = await toPng(slideElements[i], { pixelRatio: 3.0, cacheBust: false, skipFonts: true });
     const img = new Image();
     img.src = dataUrl;
     await new Promise((resolve) => {
@@ -141,29 +146,52 @@ export async function createSlideshowVideo(
   const canvas = document.createElement('canvas');
   canvas.width = canvasWidth;
   canvas.height = canvasHeight;
-  const ctx = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d', { alpha: false })!;
 
-  const fps = 30;
-  const frameDurationMs = 1000 / fps; // 33.3ms per frame
-  const totalFramesPerSlide = Math.round(fps * slideDurationSec);
-  const transitionFrames = Math.round(fps * 0.4); // 0.4s smooth swipe transition
-  const totalSlides = images.length;
-  const totalFrames = totalFramesPerSlide * totalSlides;
+  const fps = 60; // 60 FPS for ultra-smooth playback
+  const frameDurationMs = 1000 / fps; // 16.66ms per frame
+  const transitionFrames = Math.round(fps * 0.4); // 0.4s smooth swipe transition (24 frames)
+
+  // Calculate per-slide frame allocations based on dynamic pacing
+  const durationsArray = Array.isArray(slideDurations)
+    ? slideDurations
+    : Array(numSlides).fill(slideDurations);
+
+  const slideFrameCounts: number[] = [];
+  for (let i = 0; i < numSlides; i++) {
+    const sec = durationsArray[i] ?? (i === 0 ? 2.5 : i === 1 ? 5.0 : 1.5);
+    slideFrameCounts.push(Math.round(fps * sec));
+  }
+
+  // Build cumulative frame boundaries: [0, 150, 450, 540]
+  const slideStartFrames: number[] = [0];
+  for (let i = 0; i < numSlides; i++) {
+    slideStartFrames.push(slideStartFrames[i] + slideFrameCounts[i]);
+  }
+  const totalFrames = slideStartFrames[numSlides];
 
   // Stream canvas
   const stream = canvas.captureStream(fps);
   
-  let mimeType = 'video/webm;codecs=vp9';
-  if (!MediaRecorder.isTypeSupported(mimeType)) {
-    mimeType = 'video/webm';
-  }
-  if (!MediaRecorder.isTypeSupported(mimeType)) {
-    mimeType = 'video/mp4';
+  const preferredTypes = [
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+    'video/mp4',
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm'
+  ];
+
+  let mimeType = 'video/webm';
+  for (const type of preferredTypes) {
+    if (MediaRecorder.isTypeSupported(type)) {
+      mimeType = type;
+      break;
+    }
   }
 
   const mediaRecorder = new MediaRecorder(stream, {
     mimeType: MediaRecorder.isTypeSupported(mimeType) ? mimeType : undefined,
-    videoBitsPerSecond: 8000000 // 8 Mbps high quality
+    videoBitsPerSecond: 16000000 // 16 Mbps ultra high quality for YouTube compression resilience
   });
 
   const chunks: Blob[] = [];
@@ -183,7 +211,7 @@ export async function createSlideshowVideo(
 
     let frame = 0;
 
-    // Use setInterval for real-time frame pacing instead of requestAnimationFrame
+    // Use setInterval for real-time 60fps frame pacing
     const intervalId = setInterval(() => {
       if (frame >= totalFrames) {
         clearInterval(intervalId);
@@ -191,9 +219,18 @@ export async function createSlideshowVideo(
         return;
       }
 
-      const currentSlideIdx = Math.floor(frame / totalFramesPerSlide);
-      const frameInSlide = frame % totalFramesPerSlide;
-      const nextSlideIdx = (currentSlideIdx + 1) % totalSlides;
+      // Determine current slide
+      let currentSlideIdx = 0;
+      for (let i = 0; i < numSlides; i++) {
+        if (frame >= slideStartFrames[i] && frame < slideStartFrames[i + 1]) {
+          currentSlideIdx = i;
+          break;
+        }
+      }
+
+      const frameInSlide = frame - slideStartFrames[currentSlideIdx];
+      const slideDurationFrames = slideFrameCounts[currentSlideIdx];
+      const nextSlideIdx = (currentSlideIdx + 1) % numSlides;
 
       const currentImg = images[currentSlideIdx];
       const nextImg = images[nextSlideIdx];
@@ -202,8 +239,8 @@ export async function createSlideshowVideo(
       ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
       // Check if we are in the transition zone (last N frames of current slide)
-      const transitionStartFrame = totalFramesPerSlide - transitionFrames;
-      if (frameInSlide >= transitionStartFrame && currentSlideIdx < totalSlides - 1) {
+      const transitionStartFrame = slideDurationFrames - transitionFrames;
+      if (frameInSlide >= transitionStartFrame) {
         // Smooth slide-in from right transition curve (easeOutCubic)
         const progress = (frameInSlide - transitionStartFrame) / transitionFrames;
         const ease = 1 - Math.pow(1 - progress, 3);
@@ -211,7 +248,7 @@ export async function createSlideshowVideo(
 
         // Draw current slide moving left
         ctx.drawImage(currentImg, -offsetX, 0, canvasWidth, canvasHeight);
-        // Draw next slide entering from right
+        // Draw next slide entering from right (including Slide 3 -> Slide 1 for seamless infinite loop!)
         ctx.drawImage(nextImg, canvasWidth - offsetX, 0, canvasWidth, canvasHeight);
       } else {
         // Static frame display
@@ -219,7 +256,7 @@ export async function createSlideshowVideo(
       }
 
       frame++;
-      onProgress?.(40 + Math.round((frame / totalFrames) * 55));
+      onProgress?.(35 + Math.round((frame / totalFrames) * 60));
     }, frameDurationMs);
   });
 }

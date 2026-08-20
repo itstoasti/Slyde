@@ -183,7 +183,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     setIsExportingVideo(true);
     setVideoProgress(5);
     try {
-      const blob = await createSlideshowVideo(elements, 3.0, (p: number) => setVideoProgress(p));
+      const blob = await createSlideshowVideo(elements, [2.5, 5.0, 1.5], (p: number) => setVideoProgress(p));
       const url = URL.createObjectURL(blob);
       setGeneratedVideoUrl(url);
       confetti({ particleCount: 120, spread: 90, origin: { y: 0.5 } });
