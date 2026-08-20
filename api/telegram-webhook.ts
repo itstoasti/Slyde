@@ -263,7 +263,7 @@ async function captureSlidesServerless(recipe: any, host: string) {
   }
 }
 
-async function sendTelegramMessage(botToken: string, chatId: number | string, messageThreadId: number | undefined, text: string) {
+async function sendTelegramMessage(botToken: string, chatId: number | string, messageThreadId: number | undefined, text: string, parseMode: string = 'HTML') {
   try {
     await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST',
@@ -271,7 +271,8 @@ async function sendTelegramMessage(botToken: string, chatId: number | string, me
       body: JSON.stringify({
         chat_id: chatId,
         ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
-        text
+        text,
+        parse_mode: parseMode
       })
     });
   } catch (e) {}
