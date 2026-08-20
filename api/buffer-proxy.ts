@@ -262,7 +262,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             input.metadata = {
               youtube: {
                 title: title || (postText ? postText.split('\n')[0].substring(0, 60) : 'Recipe'),
-                category: 'Howto & Style',
+                categoryId: '26',
                 privacy: (isYouTube && youtubeAsDraft) ? 'private' : 'public',
                 madeForKids: false
               }
