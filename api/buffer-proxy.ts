@@ -299,7 +299,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (svc.includes('instagram')) {
             input.metadata = {
               instagram: {
-                type: 'post'
+                type: 'post',
+                shouldShareToFeed: true
               }
             };
           } else if (svc.includes('tiktok')) {
@@ -336,8 +337,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           // Attach assets: Video for YouTube, Images for Instagram/Threads/TikTok
           if (isYouTube) {
-            if (resolvedVideoUrl) {
-              input.assets = [{ video: { url: resolvedVideoUrl } }];
+            const ytVideo = videoUrl || resolvedVideoUrl;
+            if (ytVideo) {
+              input.assets = [{ video: { url: ytVideo } }];
             } else {
               delete input.assets;
             }

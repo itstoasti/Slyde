@@ -295,12 +295,43 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
     try {
       const elements = getSlideElements();
+      const slidePublicUrls: string[] = [];
       const slideDataUrls: string[] = [];
+
+      const uploadBlobToPublicHost = async (blob: Blob, filename: string): Promise<string | null> => {
+        try {
+          const formData = new FormData();
+          formData.append('reqtype', 'fileupload');
+          formData.append('time', '72h');
+          formData.append('fileToUpload', blob, filename);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 25000);
+          const res = await fetch('https://litterbox.catbox.moe/resources/internals/api.php', {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          const url = (await res.text()).trim();
+          if (url && url.startsWith('http')) {
+            return url;
+          }
+        } catch (e) {
+          console.warn('Direct upload error', e);
+        }
+        return null;
+      };
 
       if (elements.length > 0) {
         for (let i = 0; i < elements.length; i++) {
-          setBufferStatus({ loading: true, message: `Rendering Slide ${i + 1}/${elements.length} for carousel...` });
+          setBufferStatus({ loading: true, message: `Rendering & preparing Slide ${i + 1}/${elements.length}...` });
           const blob = await captureSlideAsBlob(elements[i], 1.5);
+          
+          const pubUrl = await uploadBlobToPublicHost(blob, `slide-${i + 1}.png`);
+          if (pubUrl) {
+            slidePublicUrls.push(pubUrl);
+          }
+
           const dataUrl = await new Promise<string>((resolve) => {
             const reader = new FileReader();
             reader.onloadend = () => resolve(reader.result as string);
@@ -314,15 +345,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         p => p.service.toLowerCase().includes('youtube') && bufferConfig.selectedProfileIds?.includes(p.id)
       );
 
-      let videoDataUrl: string | undefined = undefined;
+      let videoPublicUrl: string | undefined = undefined;
       if (hasYouTube && elements.length > 0) {
-        setBufferStatus({ loading: true, message: 'Rendering 60 FPS video for YouTube Shorts...' });
+        setBufferStatus({ loading: true, message: 'Rendering 60 FPS YouTube Shorts video...' });
         const videoBlob = await createSlideshowVideo(elements, [2.5, 5.0, 1.5]);
-        videoDataUrl = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(videoBlob);
-        });
+        setBufferStatus({ loading: true, message: 'Uploading video for YouTube Studio...' });
+        videoPublicUrl = (await uploadBlobToPublicHost(videoBlob, 'recipe-video.mp4')) || undefined;
       }
 
       setBufferStatus({ loading: true, message: `Dispatching across ${bufferConfig.selectedProfileIds.length} channel(s)...` });
@@ -338,14 +366,14 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       const res = await schedulePostToBuffer(
         bufferConfig,
         socialCaption,
-        slideDataUrls[0] || recipe.heroImage,
+        slidePublicUrls[0] || slideDataUrls[0] || recipe.heroImage,
         isoScheduledAt,
         recipe.title,
-        slideDataUrls.length > 0 ? slideDataUrls : undefined,
+        slidePublicUrls.length > 0 ? slidePublicUrls : (slideDataUrls.length > 0 ? slideDataUrls : undefined),
         cachedCaptions.short,
         cachedCaptions.long,
         overrideMode,
-        videoDataUrl
+        videoPublicUrl
       );
 
       setBufferStatus({ loading: false, message: res.message, success: res.success });
