@@ -191,6 +191,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // 2. Post via modern GraphQL mutation for each selected channel
       let successCount = 0;
       let lastError = '';
+      const channelResults: Array<{ name: string; service: string; success: boolean; error?: string }> = [];
 
       for (const channelId of profileIds) {
         try {
@@ -224,6 +225,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // Adapt caption length based on social platform limits
           const channelMeta = channels.find((c: any) => c.id === channelId);
           const svc = (channelMeta?.service || '').toLowerCase();
+          const channelName = channelMeta?.formatted_username || svc || channelId;
           const isYouTube = svc.includes('youtube');
           const isShortConstrained = svc.includes('twitter') || svc.includes('x') || svc.includes('pinterest') || svc.includes('threads') || svc.includes('bluesky');
 
@@ -344,28 +346,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           if (postPayload?.post?.id || postPayload?.post?.status) {
             successCount++;
-          } else if (postPayload?.message) {
-            lastError = `${svc || channelId}: ${postPayload.message}`;
-          } else if (postData.errors && postData.errors[0]) {
-            lastError = `${svc || channelId}: ${postData.errors[0].message}`;
+            channelResults.push({ name: channelName, service: svc, success: true });
+          } else {
+            const err = postPayload?.message || postData.errors?.[0]?.message || 'Unknown channel error';
+            lastError = `${svc || channelId}: ${err}`;
+            channelResults.push({ name: channelName, service: svc, success: false, error: err });
           }
         } catch (e: any) {
-          lastError = e.message;
+          const err = e.message || 'Request failed';
+          lastError = `${channelId}: ${err}`;
+          channelResults.push({ name: channelId, service: 'unknown', success: false, error: err });
         }
       }
 
-      if (successCount > 0) {
-        return res.status(200).json({
-          success: true,
-          message: scheduledAt 
-            ? `Successfully scheduled for ${new Date(scheduledAt).toLocaleString()} on ${successCount} channel(s)!`
-            : `Added to Buffer queue across ${successCount} channel(s)!`
-        });
+      const allSucceeded = successCount === profileIds.length;
+      const failedChannels = channelResults.filter(r => !r.success);
+
+      let finalMessage = '';
+      if (allSucceeded) {
+        finalMessage = scheduledAt 
+          ? `Successfully scheduled for ${new Date(scheduledAt).toLocaleString()} across all ${successCount} channel(s)!`
+          : (scheduleMode === 'now' ? `Published now across all ${successCount} channel(s)!` : `Added to Buffer queue across all ${successCount} channel(s)!`);
+      } else if (successCount > 0) {
+        const failedSummary = failedChannels.map(r => `${r.service || r.name}: ${r.error}`).join(' · ');
+        finalMessage = `Posted to ${successCount}/${profileIds.length} channels. Issues: ${failedSummary}`;
+      } else {
+        const failedSummary = failedChannels.map(r => `${r.service || r.name}: ${r.error}`).join(' · ');
+        finalMessage = failedSummary || lastError || 'Failed to schedule post on Buffer.';
       }
 
       return res.status(200).json({
-        success: false,
-        message: lastError || 'Failed to schedule post on Buffer.'
+        success: successCount > 0,
+        successCount,
+        totalChannels: profileIds.length,
+        results: channelResults,
+        message: finalMessage
       });
     }
 
