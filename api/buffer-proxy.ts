@@ -266,11 +266,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             };
           }
 
-          // Never provide dueAt when adding to queue or drafting (Buffer calculates queue time automatically)
-          if (shareMode === 'customScheduled' && dueAt && !postAsDraft) {
+          // Configure mode, schedulingType, and dueAt based on user selection
+          if (shareMode === 'shareNow' && !postAsDraft) {
+            input.mode = 'shareNow';
+            input.schedulingType = 'automatic';
+            delete input.dueAt;
+          } else if (shareMode === 'customScheduled' && dueAt && !postAsDraft) {
             input.dueAt = dueAt;
-            input.schedulingType = 'custom';
+            input.mode = 'customScheduled';
+            input.schedulingType = 'automatic';
           } else {
+            input.mode = 'addToQueue';
             input.schedulingType = 'automatic';
             delete input.dueAt;
           }
