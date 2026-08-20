@@ -240,6 +240,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             postText = longCaption;
           }
 
+          const shouldDraft = Boolean(postAsDraft || (isYouTube && youtubeAsDraft));
           const effectiveMode = shouldDraft ? 'addToQueue' : shareMode;
 
           const input: any = {
