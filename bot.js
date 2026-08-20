@@ -7,7 +7,12 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import puppeteer from 'puppeteer-core';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+
+const execFileAsync = promisify(execFile);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -467,7 +472,37 @@ async function generateVideoFromSlides(buf1, buf2, buf3) {
     }, imgB64List);
 
     const match = videoBase64.match(/^data:video\/webm;base64,(.+)$/);
-    return Buffer.from(match[1], 'base64');
+    const rawWebm = Buffer.from(match[1], 'base64');
+
+    const tmpIn = path.join('/tmp', `bot-in-${Date.now()}-${Math.random().toString(36).substring(2)}.webm`);
+    const tmpOut = path.join('/tmp', `bot-out-${Date.now()}-${Math.random().toString(36).substring(2)}.mp4`);
+
+    try {
+      fs.writeFileSync(tmpIn, rawWebm);
+      const ffmpegPath = ffmpegInstaller?.path || 'ffmpeg';
+      await execFileAsync(ffmpegPath, [
+        '-y',
+        '-i', tmpIn,
+        '-c:v', 'libx264',
+        '-pix_fmt', 'yuv420p',
+        '-profile:v', 'main',
+        '-preset', 'ultrafast',
+        '-movflags', '+faststart',
+        tmpOut
+      ]);
+
+      if (fs.existsSync(tmpOut)) {
+        const mp4Buf = fs.readFileSync(tmpOut);
+        return mp4Buf;
+      }
+    } catch (err) {
+      console.warn('Bot FFmpeg transcode error:', err.message);
+    } finally {
+      try { if (fs.existsSync(tmpIn)) fs.unlinkSync(tmpIn); } catch (e) {}
+      try { if (fs.existsSync(tmpOut)) fs.unlinkSync(tmpOut); } catch (e) {}
+    }
+
+    return rawWebm;
   } finally {
     await browser.close();
   }

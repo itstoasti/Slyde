@@ -2,7 +2,12 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { waitUntil } from '@vercel/functions';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs';
 
+const execFileAsync = promisify(execFile);
 const processedUpdates = new Set<number>();
 
 // Decode HTML entities
@@ -250,6 +255,36 @@ Save this recipe on ${brandName} — skip the life story, get straight to cookin
   return { caption, hook };
 }
 
+async function transcodeWebmToMp4(webmBuffer: Buffer): Promise<Buffer> {
+  const tmpIn = `/tmp/in-${Date.now()}-${Math.random().toString(36).substring(2)}.webm`;
+  const tmpOut = `/tmp/out-${Date.now()}-${Math.random().toString(36).substring(2)}.mp4`;
+  try {
+    fs.writeFileSync(tmpIn, webmBuffer);
+    const ffmpegPath = ffmpegInstaller?.path || 'ffmpeg';
+    await execFileAsync(ffmpegPath, [
+      '-y',
+      '-i', tmpIn,
+      '-c:v', 'libx264',
+      '-pix_fmt', 'yuv420p',
+      '-profile:v', 'main',
+      '-preset', 'ultrafast',
+      '-movflags', '+faststart',
+      tmpOut
+    ]);
+
+    if (fs.existsSync(tmpOut)) {
+      const mp4Buf = fs.readFileSync(tmpOut);
+      return mp4Buf;
+    }
+  } catch (err: any) {
+    console.warn('FFmpeg H.264 transcode error:', err.message);
+  } finally {
+    try { if (fs.existsSync(tmpIn)) fs.unlinkSync(tmpIn); } catch (e) {}
+    try { if (fs.existsSync(tmpOut)) fs.unlinkSync(tmpOut); } catch (e) {}
+  }
+  return webmBuffer;
+}
+
 // Render 3 Slides and 60 FPS Video with Serverless Chromium
 async function captureMediaServerless(recipe: any, host: string, includeVideo: boolean = true): Promise<{ slides: (Buffer | Uint8Array)[]; videoBuffer: Buffer | null }> {
   let executablePath: string;
@@ -312,16 +347,6 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
           canvas.height = 1920;
           document.body.appendChild(canvas);
           const ctx = canvas.getContext('2d', { alpha: false })!;
-
-          const fps = 30;
-          const durations = [1.5, 2.5, 1.0]; // 5.0s total pacing (Hook 1.5s, Recipe 2.5s, CTA 1.0s)
-          const slideFrameCounts = durations.map(d => Math.round(d * fps));
-          const slideStartFrames = [0];
-          for (let i = 0; i < durations.length; i++) {
-            slideStartFrames.push(slideStartFrames[i] + slideFrameCounts[i]);
-          }
-          const totalFrames = slideStartFrames[durations.length];
-          const transitionFrames = Math.round(fps * 0.3);
 
           const stream = canvas.captureStream(30);
           const recorder = new MediaRecorder(stream, {
@@ -386,7 +411,8 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
         if (videoBase64) {
           const match = videoBase64.match(/^data:video\/webm;base64,(.+)$/);
           if (match) {
-            videoBuffer = Buffer.from(match[1], 'base64');
+            const rawWebm = Buffer.from(match[1], 'base64');
+            videoBuffer = await transcodeWebmToMp4(rawWebm);
           }
         }
       } catch (vidErr) {
