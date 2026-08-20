@@ -375,11 +375,17 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       if (hasYouTube && elements.length > 0) {
         setBufferStatus({ loading: true, message: 'Rendering 60 FPS YouTube Shorts video...' });
         const videoBlob = await createSlideshowVideo(elements, [2.5, 5.0, 1.5]);
+        const videoExt = videoBlob.type.includes('mp4') ? 'mp4' : 'webm';
+        console.log(`[Slyde] Video blob: ${(videoBlob.size / (1024 * 1024)).toFixed(2)}MB, type=${videoBlob.type}`);
         setBufferStatus({ loading: true, message: 'Uploading video for YouTube Studio...' });
-        videoPublicUrl = (await uploadBlobToPublicHost(videoBlob, 'recipe-video.mp4')) || undefined;
+        videoPublicUrl = (await uploadBlobToPublicHost(videoBlob, `recipe-video.${videoExt}`)) || undefined;
+        console.log(`[Slyde] Video public URL: ${videoPublicUrl || 'FAILED'}`);
       }
 
       setBufferStatus({ loading: true, message: `Dispatching across ${bufferConfig.selectedProfileIds.length} channel(s)...` });
+      console.log(`[Slyde] Slide public URLs (${slidePublicUrls.length}):`, slidePublicUrls);
+      console.log(`[Slyde] Slide data URLs (${slideDataUrls.length}):`, slideDataUrls.map(u => u.substring(0, 60) + '...'));
+      console.log(`[Slyde] Video public URL:`, videoPublicUrl || 'NONE');
 
       let isoScheduledAt: string | undefined = undefined;
       if (bufferScheduleTime && overrideMode !== 'now') {
@@ -389,13 +395,16 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         }
       }
 
+      const finalMediaUrls = slidePublicUrls.length > 0 ? slidePublicUrls : (slideDataUrls.length > 0 ? slideDataUrls : undefined);
+      console.log(`[Slyde] Sending to Buffer: mediaUrls=${finalMediaUrls?.length || 0} items, videoUrl=${videoPublicUrl ? 'YES' : 'NO'}`);
+
       const res = await schedulePostToBuffer(
         bufferConfig,
         socialCaption,
         slidePublicUrls[0] || slideDataUrls[0] || recipe.heroImage,
         isoScheduledAt,
         recipe.title,
-        slidePublicUrls.length > 0 ? slidePublicUrls : (slideDataUrls.length > 0 ? slideDataUrls : undefined),
+        finalMediaUrls,
         cachedCaptions.short,
         cachedCaptions.long,
         overrideMode,
