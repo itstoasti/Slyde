@@ -20,18 +20,19 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
 
   const numIngs = recipe.ingredients.length;
   const numSteps = recipe.method.length;
-  const totalChars = recipe.method.join('').length + recipe.ingredients.map(i => i.name + i.amount).join('').length;
+  const methodChars = recipe.method.join('').length;
+  const totalChars = methodChars + recipe.ingredients.map(i => i.name + i.amount).join('').length;
 
-  const isHeavyContent = totalChars > 550 || numSteps >= 6 || (numSteps >= 5 && numIngs >= 8);
+  const isHeavyContent = totalChars > 420 || numSteps >= 5 || (numSteps >= 4 && numIngs >= 7);
 
   // Intelligent Automatic Layout Balancing Engine
   let computedDensity = config.density;
   if (computedDensity === 'auto') {
-    if (numSteps >= 6 || (numSteps >= 5 && numIngs >= 6) || totalChars > 500) {
+    if (numSteps >= 6 || (numSteps >= 5 && totalChars > 300) || totalChars > 420) {
       computedDensity = 'micro';
-    } else if (numIngs > 5 || numSteps > 4 || totalChars > 300) {
+    } else if (numIngs > 5 || numSteps > 4 || totalChars > 240) {
       computedDensity = 'compact';
-    } else if (numIngs <= 4 && numSteps <= 3 && totalChars < 180) {
+    } else if (numIngs <= 4 && numSteps <= 3 && totalChars < 160) {
       computedDensity = 'spacious';
     } else {
       computedDensity = 'standard';
@@ -48,16 +49,16 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
     }
   }
 
-  // Auto-fit font scaling so 100% of instructions and ingredients fit on screen
+  // Auto-fit font scaling so 100% of instructions and ingredients fit inside TikTok safe area
   let autoFontScale = config.fontScale || 1.0;
-  if (numSteps >= 6 && numIngs >= 7) {
-    autoFontScale = Math.min(autoFontScale, 0.72);
-  } else if (numSteps >= 6 || totalChars > 500) {
-    autoFontScale = Math.min(autoFontScale, 0.76);
-  } else if (numSteps >= 5 || totalChars > 350) {
-    autoFontScale = Math.min(autoFontScale, 0.84);
-  } else if (totalChars > 220) {
-    autoFontScale = Math.min(autoFontScale, 0.92);
+  if (numSteps >= 6 || (numSteps >= 5 && totalChars > 380)) {
+    autoFontScale = Math.min(autoFontScale, 0.68);
+  } else if (numSteps >= 5 || totalChars > 320) {
+    autoFontScale = Math.min(autoFontScale, 0.74);
+  } else if (numSteps >= 4 || totalChars > 240) {
+    autoFontScale = Math.min(autoFontScale, 0.82);
+  } else if (totalChars > 170) {
+    autoFontScale = Math.min(autoFontScale, 0.90);
   }
 
   // Background style based on cardStyle

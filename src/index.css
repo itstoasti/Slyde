@@ -1373,7 +1373,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 
 .slide-2 {
   background: var(--bg-dark);
-  padding: 84px 12px 24px 12px;
+  padding: 86px 12px 145px 12px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1658,6 +1658,18 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   padding: 2px 5px;
   min-height: 16px;
   border-radius: 4px;
+}
+
+.density-micro .step-text,
+.density-compact .step-text {
+  font-size: calc(0.66rem * var(--font-scale, 1));
+  line-height: 1.14;
+}
+
+.density-micro .ing-text,
+.density-compact .ing-text {
+  font-size: calc(0.64rem * var(--font-scale, 1));
+  line-height: 1.10;
 }
 
 /* Safe Macro Bar */
