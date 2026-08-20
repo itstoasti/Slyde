@@ -323,7 +323,7 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
           const totalFrames = slideStartFrames[durations.length];
           const transitionFrames = Math.round(fps * 0.3);
 
-          const stream = canvas.captureStream(fps);
+          const stream = canvas.captureStream(30);
           const recorder = new MediaRecorder(stream, {
             mimeType: 'video/webm',
             videoBitsPerSecond: 4500000
@@ -340,46 +340,45 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
             };
           });
 
+          const totalDurationMs = 7000;
+          const startTime = performance.now();
+
           recorder.start();
 
-          let frame = 0;
           const interval = setInterval(() => {
-            if (frame >= totalFrames) {
+            const elapsedMs = performance.now() - startTime;
+            if (elapsedMs >= totalDurationMs) {
               clearInterval(interval);
               recorder.stop();
               return;
             }
 
-            let curIdx = 0;
-            for (let i = 0; i < images.length; i++) {
-              if (frame >= slideStartFrames[i] && frame < slideStartFrames[i + 1]) {
-                curIdx = i;
-                break;
-              }
-            }
-
-            const frameInSlide = frame - slideStartFrames[curIdx];
-            const curDuration = slideFrameCounts[curIdx];
-            const nextIdx = (curIdx + 1) % images.length;
-            const curImg = images[curIdx];
-            const nextImg = images[nextIdx];
+            const elapsedSec = elapsedMs / 1000;
 
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, 1080, 1920);
 
-            const transStart = curDuration - transitionFrames;
-            if (frameInSlide >= transStart) {
-              const progress = (frameInSlide - transStart) / transitionFrames;
+            // Hook (0 - 2.0s), Recipe (2.0 - 5.5s), CTA (5.5 - 7.0s)
+            if (elapsedSec < 1.6) {
+              ctx.drawImage(images[0], 0, 0, 1080, 1920);
+            } else if (elapsedSec < 2.0) {
+              const progress = (elapsedSec - 1.6) / 0.4;
               const ease = 1 - Math.pow(1 - progress, 3);
               const offsetX = ease * 1080;
-              ctx.drawImage(curImg, -offsetX, 0, 1080, 1920);
-              ctx.drawImage(nextImg, 1080 - offsetX, 0, 1080, 1920);
+              ctx.drawImage(images[0], -offsetX, 0, 1080, 1920);
+              ctx.drawImage(images[1], 1080 - offsetX, 0, 1080, 1920);
+            } else if (elapsedSec < 5.1) {
+              ctx.drawImage(images[1], 0, 0, 1080, 1920);
+            } else if (elapsedSec < 5.5) {
+              const progress = (elapsedSec - 5.1) / 0.4;
+              const ease = 1 - Math.pow(1 - progress, 3);
+              const offsetX = ease * 1080;
+              ctx.drawImage(images[1], -offsetX, 0, 1080, 1920);
+              ctx.drawImage(images[2], 1080 - offsetX, 0, 1080, 1920);
             } else {
-              ctx.drawImage(curImg, 0, 0, 1080, 1920);
+              ctx.drawImage(images[2], 0, 0, 1080, 1920);
             }
-
-            frame++;
-          }, 1000 / fps);
+          }, 33);
 
           return done;
         }, imgB64List);
