@@ -55,13 +55,13 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
   let autoFontScale = config.fontScale || 1.0;
   if (config.fontScale) {
     autoFontScale = config.fontScale;
-  } else if (contentScore > 650) {
-    autoFontScale = 0.68;
   } else if (contentScore > 500) {
-    autoFontScale = 0.73;
-  } else if (contentScore > 380) {
-    autoFontScale = 0.80;
-  } else if (contentScore > 260) {
+    autoFontScale = 0.58;
+  } else if (contentScore > 400) {
+    autoFontScale = 0.66;
+  } else if (contentScore > 300) {
+    autoFontScale = 0.76;
+  } else if (contentScore > 200) {
     autoFontScale = 0.88;
   } else {
     autoFontScale = 1.0;
