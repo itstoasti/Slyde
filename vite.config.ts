@@ -581,11 +581,18 @@ function slydeServerPlugin() {
   };
 }
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), slydeServerPlugin()],
   server: {
     port: 3000,
     open: false
+  },
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        render: path.resolve(__dirname, 'render.html')
+      }
+    }
   }
 });
