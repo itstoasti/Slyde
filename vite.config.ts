@@ -45,8 +45,52 @@ function slydeServerPlugin() {
           return;
         }
 
-        // 1b. Sync Gemini API Key Config
+        // 1b. Sync AI Config (Gemini & OpenRouter)
+        const aiConfigPath = path.resolve(__dirname, 'ai_config.json');
         const geminiConfigPath = path.resolve(__dirname, 'gemini_config.json');
+
+        if (req.url === '/api/save-ai-config' && req.method === 'POST') {
+          let body = '';
+          req.on('data', chunk => { body += chunk; });
+          req.on('end', () => {
+            try {
+              const parsed = JSON.parse(body);
+              fs.writeFileSync(aiConfigPath, JSON.stringify(parsed, null, 2), 'utf-8');
+              if (parsed.geminiApiKey) {
+                fs.writeFileSync(geminiConfigPath, JSON.stringify({ apiKey: parsed.geminiApiKey }, null, 2), 'utf-8');
+              }
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: true, message: 'AI configuration saved' }));
+            } catch (e) {
+              res.statusCode = 500;
+              res.end(JSON.stringify({ success: false, error: e.message }));
+            }
+          });
+          return;
+        }
+
+        if (req.url === '/api/get-ai-config' && req.method === 'GET') {
+          if (fs.existsSync(aiConfigPath)) {
+            try {
+              const data = fs.readFileSync(aiConfigPath, 'utf-8');
+              res.setHeader('Content-Type', 'application/json');
+              res.end(data);
+              return;
+            } catch (e) {}
+          }
+          if (fs.existsSync(geminiConfigPath)) {
+            try {
+              const data = JSON.parse(fs.readFileSync(geminiConfigPath, 'utf-8'));
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ provider: 'gemini', geminiApiKey: data.apiKey || '', geminiModel: 'gemini-2.5-flash', openRouterApiKey: '', openRouterModel: 'meta-llama/llama-3.3-70b-instruct' }));
+              return;
+            } catch (e) {}
+          }
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ provider: 'gemini', geminiApiKey: '', geminiModel: 'gemini-2.5-flash', openRouterApiKey: '', openRouterModel: 'meta-llama/llama-3.3-70b-instruct' }));
+          return;
+        }
+
         if (req.url === '/api/save-gemini-config' && req.method === 'POST') {
           let body = '';
           req.on('data', chunk => {

@@ -136,3 +136,13 @@ export interface BufferConfig {
   profiles?: BufferProfile[];
   scheduleMode?: 'queue' | 'custom' | 'now';
 }
+
+export type AIProvider = 'gemini' | 'openrouter';
+
+export interface AIConfig {
+  provider: AIProvider;
+  geminiApiKey: string;
+  geminiModel: string;
+  openRouterApiKey: string;
+  openRouterModel: string;
+}

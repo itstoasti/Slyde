@@ -157,18 +157,19 @@ async function extractRecipeServer(recipeUrl: string) {
   };
 }
 
-// Generate Social Media Caption with Gemini AI
-async function generateGeminiCaptionServer(recipeData: any) {
+// Generate Social Media Caption with Gemini AI or OpenRouter
+async function generateAICaptionServer(recipeData: any) {
+  const openRouterKey = process.env.OPENROUTER_API_KEY || '';
+  const openRouterModel = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct';
   const geminiKey = process.env.GEMINI_API_KEY || '';
+  const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   const brandName = process.env.BRAND_NAME || 'SnapRecipes';
   const ctaUrl = process.env.CTA_URL || 'https://snaprecipes.xyz';
   const brandTag = brandName.replace(/\s+/g, '');
 
   let hook = `Better than takeout and ready in ${recipeData.cookTime || recipeData.prepTime}. ${recipeData.ingredients.length} ingredients, ${recipeData.method.length} steps. 🍽️`;
 
-  if (geminiKey) {
-    try {
-      const prompt = `You are a social media chef writing an appetizing 1-sentence viral hook for this recipe: "${recipeData.title}".
+  const prompt = `You are a social media chef writing an appetizing 1-sentence viral hook for this recipe: "${recipeData.title}".
 Instructions:
 - Write ONE complete, punchy sentence describing why this dish is delicious and easy.
 - Must end with a period and 🍽️.
@@ -176,7 +177,31 @@ Instructions:
 - Example: "Layers of creamy vanilla pudding and chocolate make this no-bake dessert an instant crowd favorite. 🍽️"
 Return ONLY the one complete sentence.`;
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+  if (openRouterKey) {
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openRouterKey}`,
+          'HTTP-Referer': 'https://slyde-bay.vercel.app',
+          'X-Title': 'Slyde Carousel Studio'
+        },
+        body: JSON.stringify({
+          model: openRouterModel,
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 150
+        })
+      });
+      const d = await res.json();
+      const txt = d.choices?.[0]?.message?.content?.trim();
+      if (txt && txt.length > 15 && !txt.endsWith(' in') && !txt.endsWith(' with') && !txt.endsWith(' and')) {
+        hook = txt.replace(/^["']|["']$/g, '').trim();
+      }
+    } catch (e: any) {}
+  } else if (geminiKey) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -356,7 +381,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // 3. Send clean viral caption
-      const caption = await generateGeminiCaptionServer(recipe);
+      const caption = await generateAICaptionServer(recipe);
       await sendTelegramMessage(botToken, chatId, messageThreadId, caption);
 
     } catch (err: any) {

@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { TelegramConfig, AutoPilotConfig, ThemeId, BufferConfig, BufferProfile } from '../types';
+import { TelegramConfig, AutoPilotConfig, ThemeId, BufferConfig, BufferProfile, AIConfig } from '../types';
 import { testTelegramBot, sendSlideshowToTelegram } from '../utils/telegram';
-import { testGeminiApiKey } from '../utils/geminiCaption';
+import { 
+  testGeminiApiKey, 
+  testOpenRouterApiKey, 
+  getStoredAIConfig, 
+  saveStoredAIConfig, 
+  OPENROUTER_MODELS, 
+  GEMINI_MODELS 
+} from '../utils/aiCaption';
 import { fetchBufferProfiles } from '../utils/buffer';
 import { extractRecipeFromUrl } from '../utils/recipeExtractor';
 import { captureSlideAsBlob } from '../utils/exporter';
@@ -13,7 +20,6 @@ import {
   AlertCircle, 
   Loader2, 
   ExternalLink, 
-  ShieldCheck, 
   Save,
   Clock,
   Play,
@@ -22,7 +28,9 @@ import {
   Eye,
   EyeOff,
   Share2,
-  Check
+  Check,
+  Cpu,
+  Zap
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -51,15 +59,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   slide2Ref,
   slide3Ref
 }) => {
-  const [activeTab, setActiveTab] = useState<'buffer' | 'gemini' | 'telegram' | 'autopilot'>('buffer');
+  const [activeTab, setActiveTab] = useState<'buffer' | 'ai' | 'telegram' | 'autopilot'>('ai');
   const [formData, setFormData] = useState<TelegramConfig>(config);
   const [autoPilotForm, setAutoPilotForm] = useState<AutoPilotConfig>(autoPilotConfig);
 
-  // Gemini API Key State
-  const [geminiApiKey, setGeminiApiKey] = useState<string>(localStorage.getItem('slyde_gemini_api_key') || '');
+  // Unified AI Config State (Gemini & OpenRouter)
+  const [aiConfig, setAiConfig] = useState<AIConfig>(() => getStoredAIConfig());
   const [showGeminiKey, setShowGeminiKey] = useState(false);
-  const [isTestingGemini, setIsTestingGemini] = useState(false);
-  const [geminiTestResult, setGeminiTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [showOpenRouterKey, setShowOpenRouterKey] = useState(false);
+  const [customOpenRouterModel, setCustomOpenRouterModel] = useState('');
+  const [isTestingAi, setIsTestingAi] = useState(false);
+  const [aiTestResult, setAiTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   // Buffer State
   const [bufferForm, setBufferForm] = useState<BufferConfig>(() => {
@@ -89,18 +99,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setFormData(config);
       setAutoPilotForm(autoPilotConfig);
       setTestResult(null);
-      setGeminiTestResult(null);
+      setAiTestResult(null);
 
-      // Load Gemini key
-      const storedKey = localStorage.getItem('slyde_gemini_api_key') || '';
-      setGeminiApiKey(storedKey);
+      // Load AI config from localStorage & server
+      const stored = getStoredAIConfig();
+      setAiConfig(stored);
 
-      fetch('/api/get-gemini-config')
+      const isKnown = OPENROUTER_MODELS.some(m => m.id === stored.openRouterModel);
+      if (!isKnown && stored.openRouterModel) {
+        setCustomOpenRouterModel(stored.openRouterModel);
+      }
+
+      fetch('/api/get-ai-config')
         .then(r => r.json())
         .then(data => {
-          if (data?.apiKey) {
-            setGeminiApiKey(data.apiKey);
-            localStorage.setItem('slyde_gemini_api_key', data.apiKey);
+          if (data && (data.geminiApiKey || data.openRouterApiKey)) {
+            setAiConfig(prev => ({
+              ...prev,
+              ...data
+            }));
           }
         })
         .catch(() => {});
@@ -124,25 +141,51 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleTestGemini = async () => {
-    if (!geminiApiKey.trim()) {
-      setGeminiTestResult({ success: false, message: 'Please enter a Gemini API Key.' });
-      return;
-    }
-    setIsTestingGemini(true);
-    setGeminiTestResult(null);
+  const handleTestAi = async () => {
+    setAiTestResult(null);
+    setIsTestingAi(true);
 
-    const result = await testGeminiApiKey(geminiApiKey);
-    setGeminiTestResult(result);
-    setIsTestingGemini(false);
+    if (aiConfig.provider === 'openrouter') {
+      if (!aiConfig.openRouterApiKey.trim()) {
+        setAiTestResult({ success: false, message: 'Please enter an OpenRouter API Key.' });
+        setIsTestingAi(false);
+        return;
+      }
+      const modelToUse = aiConfig.openRouterModel === 'custom' ? customOpenRouterModel.trim() : aiConfig.openRouterModel;
+      const res = await testOpenRouterApiKey(aiConfig.openRouterApiKey, modelToUse);
+      setAiTestResult(res);
+      setIsTestingAi(false);
 
-    if (result.success) {
-      localStorage.setItem('slyde_gemini_api_key', geminiApiKey.trim());
-      fetch('/api/save-gemini-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: geminiApiKey.trim() })
-      }).catch(() => {});
+      if (res.success) {
+        const updated = {
+          ...aiConfig,
+          openRouterModel: aiConfig.openRouterModel === 'custom' ? customOpenRouterModel.trim() : aiConfig.openRouterModel
+        };
+        saveStoredAIConfig(updated);
+        fetch('/api/save-ai-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updated)
+        }).catch(() => {});
+      }
+    } else {
+      if (!aiConfig.geminiApiKey.trim()) {
+        setAiTestResult({ success: false, message: 'Please enter a Gemini API Key.' });
+        setIsTestingAi(false);
+        return;
+      }
+      const res = await testGeminiApiKey(aiConfig.geminiApiKey, aiConfig.geminiModel);
+      setAiTestResult(res);
+      setIsTestingAi(false);
+
+      if (res.success) {
+        saveStoredAIConfig(aiConfig);
+        fetch('/api/save-ai-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(aiConfig)
+        }).catch(() => {});
+      }
     }
   };
 
@@ -211,12 +254,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onSaveConfig(formData);
     onSaveAutoPilotConfig(autoPilotForm);
 
-    // Save Gemini Key
-    localStorage.setItem('slyde_gemini_api_key', geminiApiKey.trim());
-    fetch('/api/save-gemini-config', {
+    // Save AI Config
+    const finalAiConfig: AIConfig = {
+      ...aiConfig,
+      openRouterModel: aiConfig.openRouterModel === 'custom' && customOpenRouterModel.trim() 
+        ? customOpenRouterModel.trim() 
+        : aiConfig.openRouterModel
+    };
+    saveStoredAIConfig(finalAiConfig);
+
+    fetch('/api/save-ai-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey: geminiApiKey.trim() })
+      body: JSON.stringify(finalAiConfig)
     }).catch(() => {});
 
     // Save Buffer Config
@@ -302,7 +352,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-container" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal-container" style={{ maxWidth: 660 }} onClick={(e) => e.stopPropagation()}>
         {/* Modal Header */}
         <div className="modal-header">
           <div className="modal-title">
@@ -318,19 +368,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="editor-nav-tabs" style={{ padding: '0 20px', background: 'transparent', gap: 4 }}>
           <button
             type="button"
+            className={`editor-tab-btn ${activeTab === 'ai' ? 'active' : ''}`}
+            onClick={() => setActiveTab('ai')}
+          >
+            <Sparkles size={14} />
+            <span>AI Engine ({aiConfig.provider === 'openrouter' ? 'OpenRouter' : 'Gemini'})</span>
+          </button>
+          <button
+            type="button"
             className={`editor-tab-btn ${activeTab === 'buffer' ? 'active' : ''}`}
             onClick={() => setActiveTab('buffer')}
           >
             <Share2 size={14} />
             <span>Buffer Scheduling</span>
-          </button>
-          <button
-            type="button"
-            className={`editor-tab-btn ${activeTab === 'gemini' ? 'active' : ''}`}
-            onClick={() => setActiveTab('gemini')}
-          >
-            <Key size={14} />
-            <span>Gemini AI</span>
           </button>
           <button
             type="button"
@@ -353,7 +403,269 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Modal Body */}
         <div className="modal-body" style={{ maxHeight: '68vh', overflowY: 'auto', padding: 22 }}>
           
-          {/* ================= TAB 1: BUFFER SCHEDULING ================= */}
+          {/* ================= TAB 1: AI ENGINE (GEMINI & OPENROUTER) ================= */}
+          {activeTab === 'ai' && (
+            <div className="settings-section">
+              <div style={{ fontWeight: 800, fontSize: '0.98rem', color: '#ffffff', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Cpu size={18} color="var(--app-primary)" />
+                <span>AI Social Caption Provider</span>
+              </div>
+              <p style={{ fontSize: '0.80rem', color: 'var(--app-text-muted)', marginBottom: 16, lineHeight: 1.4 }}>
+                Choose your AI engine to craft viral recipe hooks, tailored hashtags, and social captions for Instagram, TikTok, and YouTube.
+              </p>
+
+              {/* Provider Selector Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                {/* Option 1: Google Gemini */}
+                <div
+                  onClick={() => {
+                    setAiConfig({ ...aiConfig, provider: 'gemini' });
+                    setAiTestResult(null);
+                  }}
+                  style={{
+                    background: aiConfig.provider === 'gemini' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                    border: `1.5px solid ${aiConfig.provider === 'gemini' ? 'var(--app-primary)' : 'var(--app-border)'}`,
+                    borderRadius: 'var(--radius-md)',
+                    padding: '12px 14px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 4
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Zap size={16} color={aiConfig.provider === 'gemini' ? 'var(--app-primary)' : '#888'} />
+                      <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#ffffff' }}>Google Gemini</span>
+                    </div>
+                    {aiConfig.provider === 'gemini' && <CheckCircle2 size={16} color="var(--app-primary)" />}
+                  </div>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--app-text-muted)' }}>
+                    Free tier, ultra-fast 2.5 Flash model
+                  </span>
+                </div>
+
+                {/* Option 2: OpenRouter */}
+                <div
+                  onClick={() => {
+                    setAiConfig({ ...aiConfig, provider: 'openrouter' });
+                    setAiTestResult(null);
+                  }}
+                  style={{
+                    background: aiConfig.provider === 'openrouter' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                    border: `1.5px solid ${aiConfig.provider === 'openrouter' ? 'var(--app-primary)' : 'var(--app-border)'}`,
+                    borderRadius: 'var(--radius-md)',
+                    padding: '12px 14px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 4
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Sparkles size={16} color={aiConfig.provider === 'openrouter' ? 'var(--app-primary)' : '#888'} />
+                      <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#ffffff' }}>OpenRouter</span>
+                    </div>
+                    {aiConfig.provider === 'openrouter' && <CheckCircle2 size={16} color="var(--app-primary)" />}
+                  </div>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--app-text-muted)' }}>
+                    Llama 3.3, Claude 3.5, GPT-4o, DeepSeek
+                  </span>
+                </div>
+              </div>
+
+              {/* ============ PROVIDER SPECIFIC SETTINGS ============ */}
+              
+              {/* GOOGLE GEMINI SETTINGS */}
+              {aiConfig.provider === 'gemini' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div className="form-group">
+                    <label className="form-label">
+                      <span>Gemini API Key</span>
+                      <a
+                        href="https://aistudio.google.com/app/apikey"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="form-label-link"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                      >
+                        <span>Get Free Key</span>
+                        <ExternalLink size={12} />
+                      </a>
+                    </label>
+
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <input
+                        type={showGeminiKey ? 'text' : 'password'}
+                        className="form-input"
+                        style={{ paddingRight: 40 }}
+                        placeholder="AIzaSy..."
+                        value={aiConfig.geminiApiKey}
+                        onChange={(e) => setAiConfig({ ...aiConfig, geminiApiKey: e.target.value })}
+                      />
+                      <button
+                        type="button"
+                        style={{
+                          position: 'absolute',
+                          right: 10,
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--app-text-muted)',
+                          cursor: 'pointer',
+                          padding: 4
+                        }}
+                        onClick={() => setShowGeminiKey(!showGeminiKey)}
+                        title={showGeminiKey ? 'Hide Key' : 'Show Key'}
+                      >
+                        {showGeminiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">
+                      <span>Gemini Model</span>
+                    </label>
+                    <select
+                      className="form-select"
+                      value={aiConfig.geminiModel || 'gemini-2.5-flash'}
+                      onChange={(e) => setAiConfig({ ...aiConfig, geminiModel: e.target.value })}
+                    >
+                      {GEMINI_MODELS.map(m => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* OPENROUTER SETTINGS */}
+              {aiConfig.provider === 'openrouter' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div className="form-group">
+                    <label className="form-label">
+                      <span>OpenRouter API Key</span>
+                      <a
+                        href="https://openrouter.ai/keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="form-label-link"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                      >
+                        <span>Get OpenRouter Key</span>
+                        <ExternalLink size={12} />
+                      </a>
+                    </label>
+
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <input
+                        type={showOpenRouterKey ? 'text' : 'password'}
+                        className="form-input"
+                        style={{ paddingRight: 40 }}
+                        placeholder="sk-or-v1-..."
+                        value={aiConfig.openRouterApiKey}
+                        onChange={(e) => setAiConfig({ ...aiConfig, openRouterApiKey: e.target.value })}
+                      />
+                      <button
+                        type="button"
+                        style={{
+                          position: 'absolute',
+                          right: 10,
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--app-text-muted)',
+                          cursor: 'pointer',
+                          padding: 4
+                        }}
+                        onClick={() => setShowOpenRouterKey(!showOpenRouterKey)}
+                        title={showOpenRouterKey ? 'Hide Key' : 'Show Key'}
+                      >
+                        {showOpenRouterKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">
+                      <span>OpenRouter Model</span>
+                    </label>
+                    <select
+                      className="form-select"
+                      value={OPENROUTER_MODELS.some(m => m.id === aiConfig.openRouterModel) ? aiConfig.openRouterModel : 'custom'}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'custom') {
+                          setAiConfig({ ...aiConfig, openRouterModel: 'custom' });
+                        } else {
+                          setAiConfig({ ...aiConfig, openRouterModel: val });
+                        }
+                      }}
+                    >
+                      {OPENROUTER_MODELS.map(m => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {aiConfig.openRouterModel === 'custom' && (
+                    <div className="form-group">
+                      <label className="form-label">
+                        <span>Custom Model ID</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="e.g. qwen/qwen-2.5-72b-instruct"
+                        value={customOpenRouterModel}
+                        onChange={(e) => setCustomOpenRouterModel(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Test Button & Status Banner */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={handleTestAi}
+                  disabled={isTestingAi || (aiConfig.provider === 'gemini' ? !aiConfig.geminiApiKey.trim() : !aiConfig.openRouterApiKey.trim())}
+                >
+                  {isTestingAi ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin" />
+                      <span>Verifying {aiConfig.provider === 'openrouter' ? 'OpenRouter' : 'Gemini'}...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Key size={15} />
+                      <span>Verify {aiConfig.provider === 'openrouter' ? 'OpenRouter' : 'Gemini'} Key</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {aiTestResult && (
+                <div
+                  className={`extraction-status-banner ${aiTestResult.success ? 'success' : 'error'}`}
+                  style={{ marginTop: 14 }}
+                >
+                  {aiTestResult.success ? (
+                    <CheckCircle2 size={16} color="#10b981" />
+                  ) : (
+                    <AlertCircle size={16} color="#ef4444" />
+                  )}
+                  <span>{aiTestResult.message}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ================= TAB 2: BUFFER SCHEDULING ================= */}
           {activeTab === 'buffer' && (
             <div className="settings-section">
               <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#ffffff', marginBottom: 4 }}>
@@ -486,96 +798,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* ================= TAB 2: GEMINI AI ================= */}
-          {activeTab === 'gemini' && (
-            <div className="settings-section">
-              <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#ffffff', marginBottom: 4 }}>
-                Google Gemini API Key
-              </div>
-              <p style={{ fontSize: '0.80rem', color: 'var(--app-text-muted)', marginBottom: 16, lineHeight: 1.4 }}>
-                Powers automated viral social media captions for Instagram, TikTok, and YouTube whenever a recipe URL is extracted.
-              </p>
-
-              <div className="form-group">
-                <label className="form-label">
-                  <span>Gemini API Key</span>
-                  <a
-                    href="https://aistudio.google.com/app/apikey"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="form-label-link"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                  >
-                    <span>Get Free API Key</span>
-                    <ExternalLink size={12} />
-                  </a>
-                </label>
-
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
-                    type={showGeminiKey ? 'text' : 'password'}
-                    className="form-input"
-                    style={{ paddingRight: 40 }}
-                    placeholder="AIzaSy..."
-                    value={geminiApiKey}
-                    onChange={(e) => setGeminiApiKey(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    style={{
-                      position: 'absolute',
-                      right: 10,
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--app-text-muted)',
-                      cursor: 'pointer',
-                      padding: 4
-                    }}
-                    onClick={() => setShowGeminiKey(!showGeminiKey)}
-                    title={showGeminiKey ? 'Hide Key' : 'Show Key'}
-                  >
-                    {showGeminiKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={handleTestGemini}
-                  disabled={isTestingGemini || !geminiApiKey.trim()}
-                >
-                  {isTestingGemini ? (
-                    <>
-                      <Loader2 size={15} className="animate-spin" />
-                      <span>Verifying Key...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Key size={15} />
-                      <span>Verify Gemini Key</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {geminiTestResult && (
-                <div
-                  className={`extraction-status-banner ${geminiTestResult.success ? 'success' : 'error'}`}
-                  style={{ marginTop: 14 }}
-                >
-                  {geminiTestResult.success ? (
-                    <CheckCircle2 size={16} color="#10b981" />
-                  ) : (
-                    <AlertCircle size={16} color="#ef4444" />
-                  )}
-                  <span>{geminiTestResult.message}</span>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* ================= TAB 3: TELEGRAM BOT ================= */}
           {activeTab === 'telegram' && (
             <div className="settings-section">
@@ -600,29 +822,43 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <ExternalLink size={12} />
                   </a>
                 </label>
+
                 <input
                   type="password"
                   className="form-input"
-                  placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ..."
+                  placeholder="8436957773:AAGA7rl..."
                   value={formData.botToken}
                   onChange={(e) => setFormData({ ...formData, botToken: e.target.value })}
                 />
               </div>
 
-              <div className="form-group" style={{ marginTop: 12 }}>
+              <div className="form-group">
                 <label className="form-label">
-                  <span>Default Chat ID / Channel Username</span>
+                  <span>Target Chat ID / Channel Username / Forum Topic ID</span>
                 </label>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="-1001234567890 or @YourChannel"
+                  placeholder="@yourchannel or -100123456789"
                   value={formData.chatId}
                   onChange={(e) => setFormData({ ...formData, chatId: e.target.value })}
                 />
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
+              <div className="form-group">
+                <label className="form-label">
+                  <span>Forum Topic / Message Thread ID (Optional)</span>
+                </label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. 2381 (Leave blank for standard chat)"
+                  value={formData.messageThreadId || ''}
+                  onChange={(e) => setFormData({ ...formData, messageThreadId: e.target.value })}
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
                 <button
                   type="button"
                   className="btn-secondary"
@@ -632,12 +868,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {isTesting ? (
                     <>
                       <Loader2 size={15} className="animate-spin" />
-                      <span>Testing Connection...</span>
+                      <span>Testing Bot...</span>
                     </>
                   ) : (
                     <>
-                      <ShieldCheck size={15} />
-                      <span>Test Telegram Bot</span>
+                      <Send size={15} />
+                      <span>Test Connection</span>
                     </>
                   )}
                 </button>
@@ -659,19 +895,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* ================= TAB 4: AUTO-PILOT ================= */}
+          {/* ================= TAB 4: AUTOPILOT ================= */}
           {activeTab === 'autopilot' && (
             <div className="settings-section">
               <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#ffffff', marginBottom: 4 }}>
-                Daily Auto-Pilot Automation
+                Auto-Pilot Zero-Touch Daily Posting
               </div>
               <p style={{ fontSize: '0.80rem', color: 'var(--app-text-muted)', marginBottom: 16, lineHeight: 1.4 }}>
-                Queue up recipe URLs to automatically process and publish fresh social carousels on schedule.
+                Automatically process recipes from your queue, rotate themes, and publish carousels on a schedule.
               </p>
 
-              <div className="form-grid-2">
+              <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Posting Time</label>
+                  <label className="form-label">Schedule Time (UTC/Local)</label>
                   <input
                     type="time"
                     className="form-input"
