@@ -278,8 +278,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     }).catch(() => {});
   };
 
-  // Schedule to Buffer
-  const handleScheduleBuffer = async () => {
+  // Schedule to Buffer (supports instant shareNow or scheduled queue)
+  const handleScheduleBuffer = async (overrideMode?: 'now' | 'queue') => {
     if (!bufferConfig.accessToken) {
       onOpenSettings();
       return;
@@ -310,10 +310,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         }
       }
 
-      setBufferStatus({ loading: true, message: `Scheduling across ${bufferConfig.selectedProfileIds.length} channel(s)...` });
+      setBufferStatus({ loading: true, message: `Dispatching across ${bufferConfig.selectedProfileIds.length} channel(s)...` });
 
       let isoScheduledAt: string | undefined = undefined;
-      if (bufferScheduleTime) {
+      if (bufferScheduleTime && overrideMode !== 'now') {
         const localDate = new Date(bufferScheduleTime);
         if (!isNaN(localDate.getTime())) {
           isoScheduledAt = localDate.toISOString();
@@ -328,7 +328,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         recipe.title,
         slideDataUrls.length > 0 ? slideDataUrls : undefined,
         cachedCaptions.short,
-        cachedCaptions.long
+        cachedCaptions.long,
+        overrideMode
       );
 
       setBufferStatus({ loading: false, message: res.message, success: res.success });
@@ -726,25 +727,46 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                           </button>
                         )}
                       </div>
-                      <button
-                        type="button"
-                        className="btn-primary"
-                        style={{ padding: '7px 14px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
-                        onClick={handleScheduleBuffer}
-                        disabled={isSchedulingBuffer}
-                      >
-                        {isSchedulingBuffer ? (
-                          <>
-                            <Loader2 size={13} className="animate-spin" />
-                            <span>Scheduling...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Calendar size={13} />
-                            <span>{bufferScheduleTime ? 'Schedule Time' : 'Add to Queue'}</span>
-                          </>
-                        )}
-                      </button>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          style={{ padding: '7px 12px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+                          onClick={() => handleScheduleBuffer()}
+                          disabled={isSchedulingBuffer}
+                        >
+                          {isSchedulingBuffer ? (
+                            <>
+                              <Loader2 size={13} className="animate-spin" />
+                              <span>Sending...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Calendar size={13} />
+                              <span>{bufferScheduleTime ? 'Schedule Post' : 'Add to Queue'}</span>
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ 
+                            padding: '7px 10px', 
+                            fontSize: '0.76rem', 
+                            whiteSpace: 'nowrap',
+                            background: 'rgba(245, 158, 11, 0.12)',
+                            borderColor: 'rgba(245, 158, 11, 0.35)',
+                            color: 'var(--app-primary)'
+                          }}
+                          onClick={() => handleScheduleBuffer('now')}
+                          disabled={isSchedulingBuffer}
+                          title="Publish instantly right now across selected channels"
+                        >
+                          <Sparkles size={12} />
+                          <span>Share Now</span>
+                        </button>
+                      </div>
                     </div>
 
                     {bufferStatus && (

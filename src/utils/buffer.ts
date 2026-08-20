@@ -80,7 +80,8 @@ export async function schedulePostToBuffer(
   title?: string,
   mediaUrls?: string[],
   shortCaption?: string,
-  longCaption?: string
+  longCaption?: string,
+  scheduleModeOverride?: 'now' | 'queue' | 'custom'
 ): Promise<BufferScheduleResult> {
   const token = config.accessToken.trim();
   const profileIds = config.selectedProfileIds || [];
@@ -99,6 +100,8 @@ export async function schedulePostToBuffer(
     };
   }
 
+  const effectiveScheduleMode = scheduleModeOverride || (scheduledAt ? 'custom' : (config.scheduleMode || 'queue'));
+
   try {
     const res = await fetch('/api/buffer-proxy', {
       method: 'POST',
@@ -114,8 +117,8 @@ export async function schedulePostToBuffer(
         title,
         mediaUrl,
         mediaUrls,
-        scheduledAt,
-        scheduleMode: config.scheduleMode || 'queue',
+        scheduledAt: effectiveScheduleMode === 'custom' ? scheduledAt : undefined,
+        scheduleMode: effectiveScheduleMode,
         youtubeAsDraft: config.youtubeAsDraft ?? true,
         postAsDraft: config.postAsDraft ?? false
       })
@@ -126,9 +129,11 @@ export async function schedulePostToBuffer(
     if (result.success) {
       return {
         success: true,
-        message: scheduledAt 
-          ? `Successfully scheduled for ${new Date(scheduledAt).toLocaleString()} across ${profileIds.length} channel(s)!`
-          : `Added to Buffer queue across ${profileIds.length} social channel(s)!`
+        message: result.message || (effectiveScheduleMode === 'now' 
+          ? `Successfully shared now across ${profileIds.length} channel(s)!`
+          : (scheduledAt 
+              ? `Successfully scheduled for ${new Date(scheduledAt).toLocaleString()} across ${profileIds.length} channel(s)!`
+              : `Added to Buffer queue across ${profileIds.length} channel(s)!`))
       };
     }
 
