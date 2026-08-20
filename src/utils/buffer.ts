@@ -115,7 +115,9 @@ export async function schedulePostToBuffer(
         mediaUrl,
         mediaUrls,
         scheduledAt,
-        scheduleMode: config.scheduleMode || 'queue'
+        scheduleMode: config.scheduleMode || 'queue',
+        youtubeAsDraft: config.youtubeAsDraft ?? true,
+        postAsDraft: config.postAsDraft ?? false
       })
     });
 

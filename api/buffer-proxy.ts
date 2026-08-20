@@ -6,7 +6,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { action, token, profileIds = [], channels = [], caption, shortCaption, longCaption, title, mediaUrl, mediaUrls = [], scheduledAt, scheduleMode = 'queue' } = req.body || {};
+    const { action, token, profileIds = [], channels = [], caption, shortCaption, longCaption, title, mediaUrl, mediaUrls = [], scheduledAt, scheduleMode = 'queue', youtubeAsDraft = true, postAsDraft = false } = req.body || {};
     const cleanToken = (token || '').trim();
 
     if (!cleanToken) {
@@ -224,6 +224,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // Adapt caption length based on social platform limits
           const channelMeta = channels.find((c: any) => c.id === channelId);
           const svc = (channelMeta?.service || '').toLowerCase();
+          const isYouTube = svc.includes('youtube');
           const isShortConstrained = svc.includes('twitter') || svc.includes('x') || svc.includes('pinterest') || svc.includes('threads') || svc.includes('bluesky');
 
           let postText = caption || '';
@@ -233,20 +234,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (postText.length > maxLen) {
               postText = postText.substring(0, maxLen - 3) + '...';
             }
+          } else if (isYouTube) {
+            postText = caption || title || '';
           } else if (!isShortConstrained && longCaption && (!caption || caption.length < longCaption.length)) {
             postText = longCaption;
           }
+
+          const shouldDraft = postAsDraft || (isYouTube && youtubeAsDraft);
 
           const input: any = {
             channelId,
             text: postText,
             schedulingType: 'automatic',
-            mode: shareMode,
+            mode: shouldDraft ? 'addToQueue' : shareMode,
             needsApproval: false,
-            saveToDraft: false,
+            saveToDraft: !!shouldDraft,
             metadata: {
               tiktok: {
                 title: title || (postText ? postText.split('\n')[0].substring(0, 90) : 'Recipe')
+              },
+              youtube: {
+                title: title || (postText ? postText.split('\n')[0].substring(0, 60) : 'Recipe'),
+                privacy: (isYouTube && youtubeAsDraft) ? 'private' : 'public'
               }
             }
           };

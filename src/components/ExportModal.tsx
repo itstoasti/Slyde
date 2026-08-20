@@ -25,7 +25,7 @@ import {
   Share2, 
   Calendar, 
   AlertCircle,
-  Check 
+  Check
 } from 'lucide-react';
 
 interface ExportModalProps {
@@ -67,8 +67,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       const saved = localStorage.getItem('slyde_buffer_config');
       if (saved) return JSON.parse(saved);
     } catch (e) {}
-    return { accessToken: '', selectedProfileIds: [], profiles: [] };
+    return { accessToken: '', selectedProfileIds: [], profiles: [], youtubeAsDraft: true };
   });
+  const [youtubeAsDraft, setYoutubeAsDraft] = useState<boolean>(() => bufferConfig.youtubeAsDraft ?? true);
   const [bufferScheduleTime, setBufferScheduleTime] = useState<string>('');
   const [isSchedulingBuffer, setIsSchedulingBuffer] = useState(false);
   const [isRefreshingBuffer, setIsRefreshingBuffer] = useState(false);
@@ -630,6 +631,48 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                           <Sparkles size={11} />
                           <span><strong>Smart Length:</strong> Auto-formats short punchy caption for X & Pinterest · full recipe for TikTok & IG.</span>
                         </div>
+
+                        {/* YouTube Private Draft Toggle */}
+                        {bufferConfig.profiles?.some(p => p.service.toLowerCase().includes('youtube') && bufferConfig.selectedProfileIds?.includes(p.id)) && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            border: '1px solid rgba(239, 68, 68, 0.25)',
+                            borderRadius: 'var(--radius-sm)',
+                            padding: '6px 10px',
+                            marginTop: 4
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                              <svg width="15" height="15" viewBox="0 0 24 24" fill="#ef4444">
+                                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                              </svg>
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#ffffff' }}>
+                                  Post to YouTube as Private Draft
+                                </span>
+                                <span style={{ fontSize: '0.64rem', color: 'var(--app-text-muted)' }}>
+                                  Uploads as a private draft so you can add trending audio/music in YouTube Studio.
+                                </span>
+                              </div>
+                            </div>
+                            <label style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', cursor: 'pointer', padding: 2 }}>
+                              <input
+                                type="checkbox"
+                                checked={youtubeAsDraft}
+                                onChange={(e) => {
+                                  const val = e.target.checked;
+                                  setYoutubeAsDraft(val);
+                                  const updated = { ...bufferConfig, youtubeAsDraft: val };
+                                  setBufferConfig(updated);
+                                  localStorage.setItem('slyde_buffer_config', JSON.stringify(updated));
+                                }}
+                                style={{ cursor: 'pointer', accentColor: 'var(--app-primary)', width: 15, height: 15 }}
+                              />
+                            </label>
+                          </div>
+                        )}
                       </div>
                     )}
 

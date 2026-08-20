@@ -135,6 +135,8 @@ export interface BufferConfig {
   selectedProfileIds: string[];
   profiles?: BufferProfile[];
   scheduleMode?: 'queue' | 'custom' | 'now';
+  youtubeAsDraft?: boolean;
+  postAsDraft?: boolean;
 }
 
 export type AIProvider = 'gemini' | 'openrouter';
