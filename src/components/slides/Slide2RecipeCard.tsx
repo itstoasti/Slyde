@@ -45,16 +45,16 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
     computedColumns = numIngs >= 5 ? '2' : '1';
   }
 
-  // Mild auto-scaling — never goes below 0.88
+  // Proportional Auto-Fit Font Scaling
   let autoFontScale = 1.0;
   if (recipe.slide2Config?.fontScale && recipe.slide2Config.fontScale !== 1.0) {
     autoFontScale = recipe.slide2Config.fontScale;
-  } else if (numSteps >= 6 || totalChars > 700) {
-    autoFontScale = 0.88;
-  } else if (numSteps >= 5 || totalChars > 500) {
-    autoFontScale = 0.90;
-  } else if (numSteps >= 4 || totalChars > 350) {
-    autoFontScale = 0.94;
+  } else if (numSteps >= 6 || totalChars > 600) {
+    autoFontScale = 0.80;
+  } else if (numSteps >= 5 || totalChars > 450) {
+    autoFontScale = 0.86;
+  } else if (numSteps >= 4 || totalChars > 320) {
+    autoFontScale = 0.92;
   } else {
     autoFontScale = 1.0;
   }

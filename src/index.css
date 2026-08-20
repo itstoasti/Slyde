@@ -1629,48 +1629,48 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 /* Micro & Compact Density Enhancements for 5-6+ Steps */
 .density-micro .method-list,
 .density-compact .method-list {
-  gap: 2px;
+  gap: 1.5px;
 }
 
 .density-micro .method-step-item,
 .density-compact .method-step-item {
-  padding: 2px 5px;
-  gap: 4px;
-  border-radius: 5px;
+  padding: 1.5px 4.5px;
+  gap: 3.5px;
+  border-radius: 4.5px;
 }
 
 .density-micro .step-number-badge,
 .density-compact .step-number-badge {
-  width: 14px;
-  height: 14px;
-  font-size: 0.58rem;
+  width: 13px;
+  height: 13px;
+  font-size: 0.56rem;
   border-radius: 3px;
 }
 
 .density-micro .ingredients-grid,
 .density-compact .ingredients-grid {
-  gap: 2px 3px;
+  gap: 1.5px 3px;
 }
 
 .density-micro .ingredient-pill,
 .density-compact .ingredient-pill {
-  padding: 1.5px 4px;
-  min-height: 14px;
-  border-radius: 3.5px;
+  padding: 1.5px 3.5px;
+  min-height: 12px;
+  border-radius: 3px;
 }
 
 .density-micro .step-text,
 .density-compact .step-text {
-  font-size: calc(0.64rem * var(--font-scale, 1));
-  line-height: 1.10;
+  font-size: calc(0.62rem * var(--font-scale, 1));
+  line-height: 1.08;
   font-weight: 700;
   color: #111827 !important;
 }
 
 .density-micro .ing-text,
 .density-compact .ing-text {
-  font-size: calc(0.62rem * var(--font-scale, 1));
-  line-height: 1.06;
+  font-size: calc(0.60rem * var(--font-scale, 1));
+  line-height: 1.05;
   font-weight: 700;
   color: #111827 !important;
 }
@@ -1681,31 +1681,38 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  margin-top: 4px;
-  color: rgba(255, 255, 255, 0.85);
+  margin-top: 2px;
+  padding: 0 4px;
+}
+
+.safe-stat-item {
   font-size: 0.64rem;
   font-weight: 800;
-  letter-spacing: 0.03em;
+  color: #ffffff;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .safe-stat-divider {
   color: var(--accent-color);
   font-weight: 900;
+  font-size: 0.68rem;
 }
 
 /* =========================================================
-   SLIDE 3: BRAND CTA & CONVERSION (Full-Scale Natural Frame)
+   SLIDE 3: HIGH-CONVERSION CTA & VIRAL HOOK
    ========================================================= */
 
 .slide-3 {
-  background: radial-gradient(circle at 50% 25%, #421a08 0%, #1c0a03 50%, #0c0401 100%);
+  background: var(--bg-dark);
+  padding: 68px 18px 24px 18px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
-  padding: 44px 18px 24px 18px;
-  position: relative;
   text-align: center;
+  position: relative;
+  overflow: hidden;
   width: 100%;
   height: 100%;
 }
@@ -1715,12 +1722,12 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   top: 15%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 240px;
-  height: 240px;
-  background: radial-gradient(circle, rgba(245, 158, 11, 0.3) 0%, transparent 70%);
-  border-radius: 50%;
+  width: 260px;
+  height: 260px;
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.22) 0%, rgba(0, 0, 0, 0) 70%);
+  filter: blur(40px);
   pointer-events: none;
-  filter: blur(20px);
+  z-index: 1;
 }
 
 .cta-content-wrapper {
@@ -1737,12 +1744,19 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   background: rgba(245, 158, 11, 0.18);
   border: 1.5px solid rgba(245, 158, 11, 0.45);
   color: #fcd34d;
-  font-size: 0.70rem;
+  font-size: 0.62rem;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  padding: 5px 14px;
+  padding: 4px 12px;
   border-radius: var(--radius-full);
+  white-space: nowrap;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .cta-brand-header {
