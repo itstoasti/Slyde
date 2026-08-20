@@ -240,15 +240,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             postText = longCaption;
           }
 
-          const shouldDraft = Boolean(postAsDraft || (isYouTube && youtubeAsDraft));
-          const effectiveMode = shouldDraft ? 'addToQueue' : shareMode;
-
           const input: any = {
             channelId,
             text: postText,
-            mode: effectiveMode,
+            mode: shareMode,
             needsApproval: false,
-            saveToDraft: !!shouldDraft
+            saveToDraft: Boolean(postAsDraft)
           };
 
           // Attach platform-specific metadata ONLY for the matching service
@@ -263,14 +260,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               youtube: {
                 title: title || (postText ? postText.split('\n')[0].substring(0, 60) : 'Recipe'),
                 categoryId: '26',
-                privacy: (isYouTube && youtubeAsDraft) ? 'private' : 'public',
+                privacy: youtubeAsDraft ? 'private' : 'public',
                 madeForKids: false
               }
             };
           }
 
           // Never provide dueAt when adding to queue or drafting (Buffer calculates queue time automatically)
-          if (effectiveMode === 'customScheduled' && dueAt) {
+          if (shareMode === 'customScheduled' && dueAt && !postAsDraft) {
             input.dueAt = dueAt;
             input.schedulingType = 'custom';
           } else {
@@ -278,7 +275,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             delete input.dueAt;
           }
 
-          if (commonAssets && commonAssets.length > 0) {
+          // Attach image assets to platforms that support them (Instagram, Threads, TikTok, etc.)
+          // YouTube does NOT accept image assets in Buffer — omit assets for YouTube
+          if (!isYouTube && commonAssets && commonAssets.length > 0) {
             input.assets = commonAssets;
           }
 
@@ -340,9 +339,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (postPayload?.post?.id || postPayload?.post?.status) {
             successCount++;
           } else if (postPayload?.message) {
-            lastError = postPayload.message;
+            lastError = `${svc || channelId}: ${postPayload.message}`;
           } else if (postData.errors && postData.errors[0]) {
-            lastError = postData.errors[0].message;
+            lastError = `${svc || channelId}: ${postData.errors[0].message}`;
           }
         } catch (e: any) {
           lastError = e.message;
