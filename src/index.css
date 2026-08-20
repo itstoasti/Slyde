@@ -1373,7 +1373,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 
 .slide-2 {
   background: var(--bg-dark);
-  padding: 86px 12px 64px 12px;
+  padding: 86px 12px 48px 12px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1385,7 +1385,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
   padding: 0 4px;
   width: 100%;
 }
@@ -1393,12 +1393,12 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 .card-header-left {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   max-width: 82%;
 }
 
 .card-eyebrow {
-  font-size: 0.64rem;
+  font-size: 0.62rem;
   font-weight: 900;
   letter-spacing: 0.08em;
   color: var(--accent-color);
@@ -1408,10 +1408,10 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 .card-title {
   color: #ffffff;
   font-family: var(--font-sans);
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   font-weight: 900;
   letter-spacing: -0.02em;
-  line-height: 1.12;
+  line-height: 1.10;
 }
 
 .card-header-thumbnail {
@@ -1629,21 +1629,21 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 /* Micro & Compact Density Enhancements for 5-6+ Steps */
 .density-micro .method-list,
 .density-compact .method-list {
-  gap: 2.5px;
+  gap: 2px;
 }
 
 .density-micro .method-step-item,
 .density-compact .method-step-item {
-  padding: 2.5px 5px;
+  padding: 2px 5px;
   gap: 4px;
   border-radius: 5px;
 }
 
 .density-micro .step-number-badge,
 .density-compact .step-number-badge {
-  width: 15px;
-  height: 15px;
-  font-size: 0.60rem;
+  width: 14px;
+  height: 14px;
+  font-size: 0.58rem;
   border-radius: 3px;
 }
 
@@ -1654,7 +1654,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 
 .density-micro .ingredient-pill,
 .density-compact .ingredient-pill {
-  padding: 2px 4px;
+  padding: 1.5px 4px;
   min-height: 14px;
   border-radius: 3.5px;
 }
