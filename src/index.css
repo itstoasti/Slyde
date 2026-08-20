@@ -1434,12 +1434,12 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 .recipe-main-card {
   background: var(--bg-card, #fff8f2);
   border-radius: 14px;
-  padding: 6px 8px 4px 8px;
+  padding: 8px 10px 6px 10px;
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  gap: 3px;
+  gap: 4px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   overflow: hidden;
   transition: all 0.2s ease;
@@ -1544,9 +1544,9 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .ing-text {
-  font-size: calc(0.66rem * var(--font-scale, 1));
+  font-size: calc(0.72rem * var(--font-scale, 1));
   color: #111827 !important;
-  line-height: 1.10;
+  line-height: 1.15;
   white-space: normal;
   word-break: break-word;
   flex: 1;
@@ -1566,7 +1566,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 .method-list {
   display: flex;
   flex-direction: column;
-  gap: 2.5px;
+  gap: 3px;
   flex: 1;
   min-height: 0;
   justify-content: flex-start;
@@ -1576,7 +1576,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   background: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 6px;
-  padding: 3px 6px;
+  padding: 3.5px 7px;
   display: flex;
   align-items: flex-start;
   gap: 5px;
@@ -1591,12 +1591,12 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .step-number-badge {
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
   background: var(--pill-num-bg);
   color: var(--pill-num-text);
   border-radius: 3.5px;
-  font-size: 0.64rem;
+  font-size: 0.66rem;
   font-weight: 900;
   display: flex;
   align-items: center;
@@ -1607,9 +1607,9 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 
 .step-text,
 .step-instruction-text {
-  font-size: calc(0.66rem * var(--font-scale, 1));
+  font-size: calc(0.72rem * var(--font-scale, 1));
   color: #111827 !important;
-  line-height: 1.12;
+  line-height: 1.15;
   font-weight: 700;
   flex: 1;
   word-break: break-word;
@@ -1629,48 +1629,48 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 /* Micro & Compact Density Enhancements for 5-6+ Steps */
 .density-micro .method-list,
 .density-compact .method-list {
-  gap: 2px;
+  gap: 2.5px;
 }
 
 .density-micro .method-step-item,
 .density-compact .method-step-item {
-  padding: 2px 4.5px;
+  padding: 2.5px 5px;
   gap: 4px;
-  border-radius: 4.5px;
+  border-radius: 5px;
 }
 
 .density-micro .step-number-badge,
 .density-compact .step-number-badge {
-  width: 14px;
-  height: 14px;
-  font-size: 0.58rem;
+  width: 15px;
+  height: 15px;
+  font-size: 0.60rem;
   border-radius: 3px;
 }
 
 .density-micro .ingredients-grid,
 .density-compact .ingredients-grid {
-  gap: 1.5px 3px;
+  gap: 2px 3px;
 }
 
 .density-micro .ingredient-pill,
 .density-compact .ingredient-pill {
-  padding: 1.5px 3.5px;
-  min-height: 12px;
-  border-radius: 3px;
+  padding: 2px 4px;
+  min-height: 14px;
+  border-radius: 3.5px;
 }
 
 .density-micro .step-text,
 .density-compact .step-text {
-  font-size: calc(0.62rem * var(--font-scale, 1));
-  line-height: 1.08;
+  font-size: calc(0.68rem * var(--font-scale, 1));
+  line-height: 1.12;
   font-weight: 700;
   color: #111827 !important;
 }
 
 .density-micro .ing-text,
 .density-compact .ing-text {
-  font-size: calc(0.60rem * var(--font-scale, 1));
-  line-height: 1.05;
+  font-size: calc(0.66rem * var(--font-scale, 1));
+  line-height: 1.08;
   font-weight: 700;
   color: #111827 !important;
 }

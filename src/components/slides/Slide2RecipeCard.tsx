@@ -20,49 +20,52 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
 
   const numIngs = recipe.ingredients.length;
   const numSteps = recipe.method.length;
-  const methodChars = recipe.method.join('').length;
+
+  // Truncate long steps to keep text readable instead of shrinking fonts
+  const maxCharsPerStep = numSteps >= 6 ? 90 : numSteps >= 5 ? 110 : numSteps >= 4 ? 140 : 180;
+  const displayMethod = recipe.method.map(step => {
+    if (step.length > maxCharsPerStep) {
+      return step.substring(0, maxCharsPerStep).replace(/\s+\S*$/, '') + '…';
+    }
+    return step;
+  });
+
+  const methodChars = displayMethod.join('').length;
   const ingChars = recipe.ingredients.map(i => i.name + (i.amount || '')).join('').length;
+  const totalChars = methodChars + ingChars;
 
-  // Content Weight Scoring System
-  const contentScore = (numSteps * 35) + (numIngs * 15) + (methodChars * 0.6) + (ingChars * 0.2);
-  const isHeavyContent = contentScore > 400 || numSteps >= 5 || numIngs >= 8;
+  const isHeavyContent = totalChars > 420 || numSteps >= 5 || (numSteps >= 4 && numIngs >= 7);
 
-  // Intelligent Automatic Layout Balancing Engine
+  // Density based on truncated content
   let computedDensity = config.density;
   if (computedDensity === 'auto') {
-    if (contentScore > 480 || numSteps >= 6) {
+    if (numSteps >= 6 || (numSteps >= 5 && totalChars > 500)) {
       computedDensity = 'micro';
-    } else if (contentScore > 320 || numIngs > 5 || numSteps > 4) {
+    } else if (numSteps >= 5 || numIngs > 6 || totalChars > 380) {
       computedDensity = 'compact';
-    } else if (contentScore < 180 && numSteps <= 3) {
+    } else if (numIngs <= 4 && numSteps <= 3 && totalChars < 200) {
       computedDensity = 'spacious';
     } else {
       computedDensity = 'standard';
     }
   }
 
-  // Automatic Column Determination (2 columns for 5+ ingredients to save vertical height)
+  // 2 columns for 5+ ingredients
   let computedColumns = config.ingredientColumns;
   if (computedColumns === 'auto') {
-    if (numIngs >= 5) {
-      computedColumns = '2';
-    } else {
-      computedColumns = '1';
-    }
+    computedColumns = numIngs >= 5 ? '2' : '1';
   }
 
-  // Smooth Proportional Auto-Fit Font Scaling
+  // Readable font scale — stays between 0.82 and 1.0
   let autoFontScale = 1.0;
   if (recipe.slide2Config?.fontScale && recipe.slide2Config.fontScale !== 1.0) {
     autoFontScale = recipe.slide2Config.fontScale;
-  } else if (contentScore > 500) {
-    autoFontScale = 0.58;
-  } else if (contentScore > 400) {
-    autoFontScale = 0.66;
-  } else if (contentScore > 300) {
-    autoFontScale = 0.76;
-  } else if (contentScore > 200) {
-    autoFontScale = 0.88;
+  } else if (numSteps >= 6) {
+    autoFontScale = 0.82;
+  } else if (numSteps >= 5 || totalChars > 550) {
+    autoFontScale = 0.86;
+  } else if (numSteps >= 4 || totalChars > 400) {
+    autoFontScale = 0.92;
   } else {
     autoFontScale = 1.0;
   }
@@ -101,7 +104,7 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
       <div className="card-top-header">
         <div className="card-header-left">
           <span className="card-eyebrow">RECIPE CARD</span>
-          <h2 className="card-title" style={{ fontSize: `calc(1.15rem * ${autoFontScale})` }}>
+          <h2 className="card-title">
             {recipe.title}
           </h2>
         </div>
@@ -116,7 +119,7 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
       <div className={`recipe-main-card card-style-${config.cardStyle} ${isHeavyContent ? 'card-heavy-content' : 'card-balanced-content'}`}>
         {/* Ingredients Section */}
         <div className="recipe-section ingredients-section">
-          <h3 className="section-title" style={{ fontSize: `calc(0.85rem * ${autoFontScale})` }}>
+          <h3 className="section-title">
             <span className="section-bar">|</span> Ingredients ({recipe.ingredients.length})
           </h3>
           <div 
@@ -136,11 +139,11 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
 
         {/* Method Section */}
         <div className="recipe-section method-section">
-          <h3 className="section-title" style={{ fontSize: `calc(0.85rem * ${autoFontScale})` }}>
+          <h3 className="section-title">
             <span className="section-bar">|</span> Method ({recipe.method.length} steps)
           </h3>
           <div className="method-list">
-            {recipe.method.map((step, idx) => (
+            {displayMethod.map((step, idx) => (
               <div key={idx} className="method-step-item">
                 <div className="step-number-badge">{idx + 1}</div>
                 <div className="step-text">{step}</div>
