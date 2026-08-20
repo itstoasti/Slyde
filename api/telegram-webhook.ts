@@ -247,8 +247,8 @@ Save this recipe on ${brandName} — skip the life story, get straight to cookin
   return { caption, hook };
 }
 
-// Render 3 Slides with Serverless Chromium
-async function captureSlidesServerless(recipe: any, host: string) {
+// Render 3 Slides and 60 FPS Video with Serverless Chromium
+async function captureMediaServerless(recipe: any, host: string, includeVideo: boolean = true): Promise<{ slides: (Buffer | Uint8Array)[]; videoBuffer: Buffer | null }> {
   let executablePath: string;
   try {
     executablePath = await chromium.executablePath();
@@ -289,8 +289,114 @@ async function captureSlidesServerless(recipe: any, host: string) {
       slide3El.screenshot({ type: 'png' })
     ]);
 
+    let videoBuffer: Buffer | null = null;
+    if (includeVideo) {
+      try {
+        const imgB64List = [buf1.toString('base64'), buf2.toString('base64'), buf3.toString('base64')];
+
+        const videoPage = await browser.newPage();
+        await videoPage.setViewport({ width: 1080, height: 1920 });
+
+        const videoBase64 = await videoPage.evaluate(async (b64Images) => {
+          const images = await Promise.all(b64Images.map(src => new Promise<HTMLImageElement>(resolve => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.src = 'data:image/png;base64,' + src;
+          })));
+
+          const canvas = document.createElement('canvas');
+          canvas.width = 1080;
+          canvas.height = 1920;
+          document.body.appendChild(canvas);
+          const ctx = canvas.getContext('2d', { alpha: false })!;
+
+          const fps = 60;
+          const durations = [2.0, 3.5, 1.5]; // 7.0s total pacing
+          const slideFrameCounts = durations.map(d => Math.round(d * fps));
+          const slideStartFrames = [0];
+          for (let i = 0; i < durations.length; i++) {
+            slideStartFrames.push(slideStartFrames[i] + slideFrameCounts[i]);
+          }
+          const totalFrames = slideStartFrames[durations.length];
+          const transitionFrames = Math.round(fps * 0.35);
+
+          const stream = canvas.captureStream(fps);
+          const recorder = new MediaRecorder(stream, {
+            mimeType: 'video/webm',
+            videoBitsPerSecond: 5000000
+          });
+          const chunks: Blob[] = [];
+          recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+          const done = new Promise<string>(resolve => {
+            recorder.onstop = () => {
+              const blob = new Blob(chunks, { type: 'video/webm' });
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(blob);
+            };
+          });
+
+          recorder.start();
+
+          let frame = 0;
+          const interval = setInterval(() => {
+            if (frame >= totalFrames) {
+              clearInterval(interval);
+              recorder.stop();
+              return;
+            }
+
+            let curIdx = 0;
+            for (let i = 0; i < images.length; i++) {
+              if (frame >= slideStartFrames[i] && frame < slideStartFrames[i + 1]) {
+                curIdx = i;
+                break;
+              }
+            }
+
+            const frameInSlide = frame - slideStartFrames[curIdx];
+            const curDuration = slideFrameCounts[curIdx];
+            const nextIdx = (curIdx + 1) % images.length;
+            const curImg = images[curIdx];
+            const nextImg = images[nextIdx];
+
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, 1080, 1920);
+
+            const transStart = curDuration - transitionFrames;
+            if (frameInSlide >= transStart) {
+              const progress = (frameInSlide - transStart) / transitionFrames;
+              const ease = 1 - Math.pow(1 - progress, 3);
+              const offsetX = ease * 1080;
+              ctx.drawImage(curImg, -offsetX, 0, 1080, 1920);
+              ctx.drawImage(nextImg, 1080 - offsetX, 0, 1080, 1920);
+            } else {
+              ctx.drawImage(curImg, 0, 0, 1080, 1920);
+            }
+
+            frame++;
+          }, 1000 / fps);
+
+          return done;
+        }, imgB64List);
+
+        if (videoBase64) {
+          const match = videoBase64.match(/^data:video\/webm;base64,(.+)$/);
+          if (match) {
+            videoBuffer = Buffer.from(match[1], 'base64');
+          }
+        }
+      } catch (vidErr) {
+        console.warn('Video generation error in serverless:', vidErr);
+      }
+    }
+
     await browser.close();
-    return [buf1, buf2, buf3];
+    return {
+      slides: [buf1, buf2, buf3],
+      videoBuffer
+    };
   } catch (err) {
     await browser.close();
     throw err;
@@ -323,13 +429,34 @@ async function sendTelegramAlbum(botToken: string, chatId: number | string, mess
   formData.append('slide_3', new Blob([buffers[2]], { type: 'image/png' }), 'slide-3.png');
 
   const media = [
-    { type: 'photo', media: 'attach://slide_1', caption: `🍳 <b>${title}</b>`, parse_mode: 'HTML' },
+    { type: 'photo', media: 'attach://slide_1', caption: `🍳 <b>${title}</b> (3-Slide Carousel Album)`, parse_mode: 'HTML' },
     { type: 'photo', media: 'attach://slide_2' },
     { type: 'photo', media: 'attach://slide_3' }
   ];
   formData.append('media', JSON.stringify(media));
 
   const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMediaGroup`, {
+    method: 'POST',
+    body: formData
+  });
+  return await res.json();
+}
+
+async function sendTelegramVideo(botToken: string, chatId: number | string, messageThreadId: number | undefined, videoBuffer: Buffer, title: string) {
+  const formData = new FormData();
+  formData.append('chat_id', String(chatId));
+  if (messageThreadId) {
+    formData.append('message_thread_id', String(messageThreadId));
+  }
+  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  formData.append('video', new Blob([videoBuffer], { type: 'video/mp4' }), `${slug}-shorts.mp4`);
+  formData.append('caption', `🎬 <b>${title}</b>\n\n<i>✨ 60 FPS 9:16 Shorts/TikTok video ready! Tap to save to camera roll & add trending audio in the YouTube/TikTok app.</i>`);
+  formData.append('parse_mode', 'HTML');
+  formData.append('supports_streaming', 'true');
+  formData.append('width', '1080');
+  formData.append('height', '1920');
+
+  const res = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, {
     method: 'POST',
     body: formData
   });
@@ -365,7 +492,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       botToken,
       chatId,
       messageThreadId,
-      `👋 <b>Welcome to Slyde Bot!</b>\n\nSend me <b>any recipe URL</b> (from AllRecipes, NYT Cooking, food blogs) and I will automatically reply with:\n\n1️⃣ <b>Full 3-Slide Carousel Album</b> (Hook, Recipe Card, CTA)\n2️⃣ <b>Viral Social Caption</b> with ingredients, steps, and hashtags!`
+      `🎬 <b>Welcome to Slyde Automation Bot!</b>\n\nSend me <b>any recipe URL</b> or use commands:\n\n🎥 <b>/video &lt;url&gt;</b> — 60 FPS 9:16 Video (Ready for YouTube Shorts & TikTok)\n📸 <b>/slides &lt;url&gt;</b> — 3-Slide Carousel Album (Instagram & Threads)\n⚡ <b>/all &lt;url&gt;</b> (or paste any URL) — Both Video + 3 Slides + Caption\n📋 <b>/caption &lt;url&gt;</b> — Viral Social Caption only\n\n<i>💡 Tip: Tap and save the video directly to your phone camera roll to add trending sounds in the YouTube Shorts or TikTok app!</i>`
     );
     return res.status(200).send('OK');
   }
@@ -373,9 +500,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const urlMatch = text.match(/https?:\/\/[^\s]+/i);
   if (urlMatch) {
     const recipeUrl = urlMatch[0];
+    const lowerText = text.toLowerCase().trim();
+
+    const isVideoOnly = lowerText.startsWith('/video') || lowerText.startsWith('/short') || lowerText.startsWith('/reel') || lowerText.startsWith('/v ');
+    const isSlidesOnly = lowerText.startsWith('/slides') || lowerText.startsWith('/carousel') || lowerText.startsWith('/album') || lowerText.startsWith('/s ');
+    const isCaptionOnly = lowerText.startsWith('/caption') || lowerText.startsWith('/c ');
+
+    const modeText = isVideoOnly ? '🎬 60 FPS Video' : (isSlidesOnly ? '📸 3 Social Slides' : '⚡ 60 FPS Video + 3 Slides');
 
     // 1. Immediate acknowledgment
-    await sendTelegramMessage(botToken, chatId, messageThreadId, '👨‍🍳 <b>Extracting recipe & rendering 3 social slides...</b>');
+    await sendTelegramMessage(botToken, chatId, messageThreadId, `👨‍🍳 <b>Extracting recipe & generating ${modeText}...</b>`);
 
     try {
       const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'slyde-bay.vercel.app';
@@ -387,12 +521,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         recipe.shortHook = hook.replace(/🍽️/g, '').trim();
       }
 
-      // 3. Render all 3 slides using Chromium & send photo album
+      if (isCaptionOnly) {
+        await sendTelegramMessage(botToken, chatId, messageThreadId, caption);
+        return res.status(200).send('OK');
+      }
+
+      // 3. Render slides & video with Serverless Chromium
       try {
-        const buffers = await captureSlidesServerless(recipe, host);
-        await sendTelegramAlbum(botToken, chatId, messageThreadId, buffers, recipe.title);
+        const needsVideo = isVideoOnly || !isSlidesOnly;
+        const media = await captureMediaServerless(recipe, host, needsVideo);
+
+        // Send 60 FPS Video if requested
+        if (media.videoBuffer && (isVideoOnly || !isSlidesOnly)) {
+          await sendTelegramVideo(botToken, chatId, messageThreadId, media.videoBuffer, recipe.title);
+        }
+
+        // Send 3-slide photo album if requested
+        if (media.slides && (isSlidesOnly || !isVideoOnly)) {
+          await sendTelegramAlbum(botToken, chatId, messageThreadId, media.slides, recipe.title);
+        }
       } catch (renderErr: any) {
-        console.warn('Chromium render failed in serverless, sending fallback photo:', renderErr.message);
+        console.warn('Chromium render failed in serverless:', renderErr.message);
       }
 
       // 4. Send clean viral caption
