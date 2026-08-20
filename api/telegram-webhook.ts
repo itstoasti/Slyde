@@ -160,20 +160,20 @@ async function extractRecipeServer(recipeUrl: string) {
 // Generate Social Media Caption with Gemini AI or OpenRouter
 async function generateAICaptionServer(recipeData: any) {
   const openRouterKey = process.env.OPENROUTER_API_KEY || '';
-  const openRouterModel = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct';
-  const geminiKey = process.env.GEMINI_API_KEY || '';
+  const openRouterModel = process.env.OPENROUTER_MODEL || 'openrouter/auto';
+  const geminiKey = process.env.GEMINI_API_KEY || 'AIzaSyB8yOmrHTwl6Gp5xEVd_hyWsfnEipxN2Jc';
   const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   const brandName = process.env.BRAND_NAME || 'SnapRecipes';
   const ctaUrl = process.env.CTA_URL || 'https://snaprecipes.xyz';
   const brandTag = brandName.replace(/\s+/g, '');
 
-  let hook = `Better than takeout and ready in ${recipeData.cookTime || recipeData.prepTime}. ${recipeData.ingredients.length} ingredients, ${recipeData.method.length} steps. 🍽️`;
+  let hook = `Layers of creamy sweetness and rich flavor make this an instant crowd favorite. 🍽️`;
 
   const prompt = `You are a social media chef writing an appetizing 1-sentence viral hook for this recipe: "${recipeData.title}".
 Instructions:
-- Write ONE complete, punchy sentence describing why this dish is delicious and easy.
+- Write ONE complete, punchy sentence (8-14 words) describing why this dish is delicious and easy.
 - Must end with a period and 🍽️.
-- DO NOT end mid-sentence or with a preposition (like "in", "with", "and").
+- DO NOT end mid-sentence.
 - Example: "Layers of creamy vanilla pudding and chocolate make this no-bake dessert an instant crowd favorite. 🍽️"
 Return ONLY the one complete sentence.`;
 
@@ -189,14 +189,18 @@ Return ONLY the one complete sentence.`;
         },
         body: JSON.stringify({
           model: openRouterModel,
-          messages: [{ role: 'user', content: prompt }],
+          messages: [
+            { role: 'system', content: 'You are an AI chef that outputs ONLY a single 1-sentence hook ending with 🍽️. Never output thinking or preambles.' },
+            { role: 'user', content: prompt }
+          ],
           max_tokens: 150
         })
       });
       const d = await res.json();
-      const txt = d.choices?.[0]?.message?.content?.trim();
-      if (txt && txt.length > 15 && !txt.endsWith(' in') && !txt.endsWith(' with') && !txt.endsWith(' and')) {
-        hook = txt.replace(/^["']|["']$/g, '').trim();
+      let txt = d.choices?.[0]?.message?.content?.trim() || d.choices?.[0]?.text?.trim() || '';
+      txt = txt.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/```/g, '').replace(/^["']|["']$/g, '').trim();
+      if (txt && txt.length > 10 && !txt.toLowerCase().includes('we need to') && !txt.toLowerCase().includes('let\'s count')) {
+        hook = txt.endsWith('🍽️') ? txt : `${txt} 🍽️`;
       }
     } catch (e: any) {}
   } else if (geminiKey) {
@@ -210,9 +214,10 @@ Return ONLY the one complete sentence.`;
         })
       });
       const d = await res.json();
-      const txt = d.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      if (txt && txt.length > 15 && !txt.endsWith(' in') && !txt.endsWith(' with') && !txt.endsWith(' and')) {
-        hook = txt.replace(/^["']|["']$/g, '').trim();
+      let txt = d.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+      txt = txt.replace(/^["']|["']$/g, '').trim();
+      if (txt && txt.length > 10) {
+        hook = txt.endsWith('🍽️') ? txt : `${txt} 🍽️`;
       }
     } catch (e: any) {}
   }
