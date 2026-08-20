@@ -20,23 +20,12 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
 
   const numIngs = recipe.ingredients.length;
   const numSteps = recipe.method.length;
-
-  // Truncate long steps to keep text readable instead of shrinking fonts
-  const maxCharsPerStep = numSteps >= 6 ? 90 : numSteps >= 5 ? 110 : numSteps >= 4 ? 140 : 180;
-  const displayMethod = recipe.method.map(step => {
-    if (step.length > maxCharsPerStep) {
-      return step.substring(0, maxCharsPerStep).replace(/\s+\S*$/, '') + '…';
-    }
-    return step;
-  });
-
-  const methodChars = displayMethod.join('').length;
-  const ingChars = recipe.ingredients.map(i => i.name + (i.amount || '')).join('').length;
-  const totalChars = methodChars + ingChars;
+  const methodChars = recipe.method.join('').length;
+  const totalChars = methodChars + recipe.ingredients.map(i => i.name + (i.amount || '')).join('').length;
 
   const isHeavyContent = totalChars > 420 || numSteps >= 5 || (numSteps >= 4 && numIngs >= 7);
 
-  // Density based on truncated content
+  // Density class
   let computedDensity = config.density;
   if (computedDensity === 'auto') {
     if (numSteps >= 6 || (numSteps >= 5 && totalChars > 500)) {
@@ -56,16 +45,16 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
     computedColumns = numIngs >= 5 ? '2' : '1';
   }
 
-  // Readable font scale — stays between 0.82 and 1.0
+  // Mild auto-scaling — never goes below 0.88
   let autoFontScale = 1.0;
   if (recipe.slide2Config?.fontScale && recipe.slide2Config.fontScale !== 1.0) {
     autoFontScale = recipe.slide2Config.fontScale;
-  } else if (numSteps >= 6) {
-    autoFontScale = 0.82;
-  } else if (numSteps >= 5 || totalChars > 550) {
-    autoFontScale = 0.86;
-  } else if (numSteps >= 4 || totalChars > 400) {
-    autoFontScale = 0.92;
+  } else if (numSteps >= 6 || totalChars > 700) {
+    autoFontScale = 0.88;
+  } else if (numSteps >= 5 || totalChars > 500) {
+    autoFontScale = 0.90;
+  } else if (numSteps >= 4 || totalChars > 350) {
+    autoFontScale = 0.94;
   } else {
     autoFontScale = 1.0;
   }
@@ -143,7 +132,7 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
             <span className="section-bar">|</span> Method ({recipe.method.length} steps)
           </h3>
           <div className="method-list">
-            {displayMethod.map((step, idx) => (
+            {recipe.method.map((step, idx) => (
               <div key={idx} className="method-step-item">
                 <div className="step-number-badge">{idx + 1}</div>
                 <div className="step-text">{step}</div>

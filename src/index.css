@@ -1544,22 +1544,22 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .ing-text {
-  font-size: calc(0.72rem * var(--font-scale, 1));
+  font-size: calc(0.68rem * var(--font-scale, 1));
   color: #111827 !important;
-  line-height: 1.15;
+  line-height: 1.12;
   white-space: normal;
   word-break: break-word;
   flex: 1;
 }
 
 .ing-name {
-  font-weight: 800;
+  font-weight: 700;
   color: #111827 !important;
 }
 
 .ing-amount {
   color: #374151 !important;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* Method Step Items */
@@ -1576,7 +1576,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   background: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 6px;
-  padding: 3.5px 7px;
+  padding: 3px 6px;
   display: flex;
   align-items: flex-start;
   gap: 5px;
@@ -1591,12 +1591,12 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .step-number-badge {
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
   background: var(--pill-num-bg);
   color: var(--pill-num-text);
   border-radius: 3.5px;
-  font-size: 0.66rem;
+  font-size: 0.64rem;
   font-weight: 900;
   display: flex;
   align-items: center;
@@ -1607,9 +1607,9 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 
 .step-text,
 .step-instruction-text {
-  font-size: calc(0.72rem * var(--font-scale, 1));
+  font-size: calc(0.68rem * var(--font-scale, 1));
   color: #111827 !important;
-  line-height: 1.15;
+  line-height: 1.12;
   font-weight: 700;
   flex: 1;
   word-break: break-word;
@@ -1661,16 +1661,16 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 
 .density-micro .step-text,
 .density-compact .step-text {
-  font-size: calc(0.68rem * var(--font-scale, 1));
-  line-height: 1.12;
+  font-size: calc(0.64rem * var(--font-scale, 1));
+  line-height: 1.10;
   font-weight: 700;
   color: #111827 !important;
 }
 
 .density-micro .ing-text,
 .density-compact .ing-text {
-  font-size: calc(0.66rem * var(--font-scale, 1));
-  line-height: 1.08;
+  font-size: calc(0.62rem * var(--font-scale, 1));
+  line-height: 1.06;
   font-weight: 700;
   color: #111827 !important;
 }
