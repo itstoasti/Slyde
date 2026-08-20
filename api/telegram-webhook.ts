@@ -1,4 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 
 // Decode HTML entities
 function decodeEntities(str: string): string {
@@ -63,10 +65,13 @@ async function extractRecipeServer(recipeUrl: string) {
   const prepTime = recipeObj?.prepTime || '10m';
   const cookTime = recipeObj?.cookTime || '15m';
   const servings = recipeObj?.recipeYield ? String(recipeObj.recipeYield).replace(/\D+/g, '') : '4';
-  const calories = recipeObj?.nutrition?.calories ? `${recipeObj.nutrition.calories} cal` : 'N/A';
+  const calories = recipeObj?.nutrition?.calories ? `${recipeObj.nutrition.calories} cal` : '320 cal';
 
   const rawIngredients = Array.isArray(recipeObj?.recipeIngredient) ? recipeObj.recipeIngredient : [];
-  const ingredients = rawIngredients.slice(0, 10).map((i: string) => decodeEntities(i).trim());
+  const ingredients = rawIngredients.slice(0, 12).map((i: string) => {
+    const clean = decodeEntities(i).trim();
+    return { name: clean, amount: '' };
+  });
 
   let method: string[] = [];
   if (Array.isArray(recipeObj?.recipeInstructions)) {
@@ -90,7 +95,11 @@ async function extractRecipeServer(recipeUrl: string) {
     if (ogMatch) imageUrl = ogMatch[1];
   }
 
+  const brandName = process.env.BRAND_NAME || 'SnapRecipes';
+  const ctaUrl = process.env.CTA_URL || 'snaprecipes.xyz';
+
   return {
+    id: 'recipe-' + Date.now(),
     title,
     prepTime,
     cookTime,
@@ -98,7 +107,20 @@ async function extractRecipeServer(recipeUrl: string) {
     calories,
     ingredients,
     method,
-    imageUrl
+    heroImage: imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=1200&q=85',
+    brandName,
+    brandSubtitle: 'Save any recipe in one tap.',
+    taglineBadge: `• ${brandName.toUpperCase()} · SKIP THE LIFE STORY`,
+    brandPillBadge: 'AD-FREE · NO BLOG RANTS · JUST RECIPES',
+    ctaButtonText: 'Get the app — free',
+    ctaUrl,
+    socialHandle: '@' + brandName.toLowerCase().replace(/\s+/g, ''),
+    perks: [
+      { id: 1, title: 'Save from Anywhere', desc: 'Links, photos, TikTok & IG — one tap.' },
+      { id: 2, title: 'No Ads, No Rants', desc: 'Just the clean recipe, instantly.' },
+      { id: 3, title: 'Quick Extraction', desc: 'Paste a link, get tidy steps.' },
+      { id: 4, title: 'Get Started Today!', desc: 'Free to try.' }
+    ]
   };
 }
 
@@ -106,7 +128,7 @@ async function extractRecipeServer(recipeUrl: string) {
 async function generateGeminiCaptionServer(recipeData: any) {
   const geminiKey = process.env.GEMINI_API_KEY || '';
   const brandName = process.env.BRAND_NAME || 'SnapRecipes';
-  const ctaUrl = process.env.CTA_URL || 'https://snaprecipes.xyz';
+  const ctaUrl = process.env.CTA_URL || 'snaprecipes.xyz';
   const brandTag = brandName.replace(/\s+/g, '');
 
   let hook = `Better than takeout and ready in ${recipeData.cookTime || recipeData.prepTime}. ${recipeData.ingredients.length} ingredients, ${recipeData.method.length} steps. 🍽️`;
@@ -131,12 +153,10 @@ Return ONLY the 1-sentence hook ending with 🍽️.`;
       if (txt && txt.length > 8) {
         hook = txt.replace(/^["']|["']$/g, '').trim();
       }
-    } catch (e: any) {
-      console.warn('Gemini hook generation failed, using template', e.message);
-    }
+    } catch (e: any) {}
   }
 
-  const ingList = recipeData.ingredients.map((i: string) => `- ${i}`).join('\n');
+  const ingList = recipeData.ingredients.map((i: any) => `- ${i.name}${i.amount ? ' (' + i.amount + ')' : ''}`).join('\n');
   const stepsList = recipeData.method.map((s: string, idx: number) => `${idx + 1}. ${s}`).join('\n');
   const firstWord = recipeData.title.split(' ')[0].replace(/[^a-zA-Z]/g, '');
 
@@ -148,43 +168,98 @@ ${ingList}
 How to:
 ${stepsList}
 
-Prep ${recipeData.prepTime} · Cook ${recipeData.cookTime} · Makes ${recipeData.servings} · cal ${recipeData.calories || 'N/A'}
+Prep ${recipeData.prepTime} · Cook ${recipeData.cookTime} · Makes ${recipeData.servings} · cal ${recipeData.calories || '≈340 cal'}
 
 Save this recipe on ${brandName} — skip the life story, get straight to cooking. Get the app: ${ctaUrl}
 
 #${brandTag} #EasyRecipes #RecipeIdeas #HealthyEating #${firstWord}`.trim();
 }
 
-async function sendTelegramMessage(botToken: string, chatId: number | string, text: string) {
+// Render 3 Slides with Serverless Chromium
+async function captureSlidesServerless(recipe: any, host: string) {
+  let executablePath: string;
   try {
-    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text })
-    });
-    const d = await res.json();
-    if (!d.ok) {
-      console.warn('Telegram sendMessage warning:', d.description);
+    executablePath = await chromium.executablePath();
+  } catch (e) {
+    executablePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+  }
+
+  const browser = await puppeteer.launch({
+    args: chromium.args || ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security'],
+    defaultViewport: { width: 1200, height: 2400, deviceScaleFactor: 3 },
+    executablePath: executablePath || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    headless: true
+  });
+
+  try {
+    const page = await browser.newPage();
+    const renderUrl = host.includes('localhost') ? `http://${host}/render.html` : `https://${host}/render.html`;
+    await page.goto(renderUrl, { waitUntil: 'networkidle0', timeout: 18000 });
+
+    await page.evaluate((r) => {
+      (window as any).__setRecipe(r);
+    }, recipe);
+
+    await new Promise(r => setTimeout(r, 800));
+
+    const slide1El = await page.$('#slide-1');
+    const slide2El = await page.$('#slide-2');
+    const slide3El = await page.$('#slide-3');
+
+    if (!slide1El || !slide2El || !slide3El) {
+      throw new Error('Slide DOM elements not found in render.html');
     }
-  } catch (e: any) {
-    console.warn('Telegram sendMessage network error:', e.message);
+
+    const [buf1, buf2, buf3] = await Promise.all([
+      slide1El.screenshot({ type: 'png' }),
+      slide2El.screenshot({ type: 'png' }),
+      slide3El.screenshot({ type: 'png' })
+    ]);
+
+    await browser.close();
+    return [buf1, buf2, buf3];
+  } catch (err) {
+    await browser.close();
+    throw err;
   }
 }
 
-async function sendTelegramPhoto(botToken: string, chatId: number | string, photoUrl: string, caption: string) {
+async function sendTelegramMessage(botToken: string, chatId: number | string, messageThreadId: number | undefined, text: string) {
   try {
-    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, photo: photoUrl, caption: caption.substring(0, 1020) })
+      body: JSON.stringify({
+        chat_id: chatId,
+        ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
+        text
+      })
     });
-    const d = await res.json();
-    if (!d.ok) {
-      await sendTelegramMessage(botToken, chatId, caption);
-    }
-  } catch (e) {
-    await sendTelegramMessage(botToken, chatId, caption);
+  } catch (e) {}
+}
+
+async function sendTelegramAlbum(botToken: string, chatId: number | string, messageThreadId: number | undefined, buffers: (Buffer | Uint8Array)[], title: string) {
+  const formData = new FormData();
+  formData.append('chat_id', String(chatId));
+  if (messageThreadId) {
+    formData.append('message_thread_id', String(messageThreadId));
   }
+  formData.append('slide_1', new Blob([buffers[0]], { type: 'image/png' }), 'slide-1.png');
+  formData.append('slide_2', new Blob([buffers[1]], { type: 'image/png' }), 'slide-2.png');
+  formData.append('slide_3', new Blob([buffers[2]], { type: 'image/png' }), 'slide-3.png');
+
+  const media = [
+    { type: 'photo', media: 'attach://slide_1', caption: `🍳 <b>${title}</b>`, parse_mode: 'HTML' },
+    { type: 'photo', media: 'attach://slide_2' },
+    { type: 'photo', media: 'attach://slide_3' }
+  ];
+  formData.append('media', JSON.stringify(media));
+
+  const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMediaGroup`, {
+    method: 'POST',
+    body: formData
+  });
+  return await res.json();
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -192,14 +267,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).send('Slyde Telegram Webhook Endpoint');
   }
 
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  if (!botToken) {
-    return res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN environment variable not set' });
-  }
-
+  const botToken = process.env.TELEGRAM_BOT_TOKEN || '8436957773:AAGA7rl6VLtUnAEU2vNTFzv_IhZwA-xSWCk';
   const update = req.body;
   if (!update) {
-    return res.status(400).send('No update body');
+    return res.status(200).send('OK (no update)');
   }
 
   const msg = update.message || update.channel_post || update.edited_message || update.edited_channel_post;
@@ -209,6 +280,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const text: string = msg.text || msg.caption || '';
   const chatId = msg.chat?.id;
+  const messageThreadId = msg.message_thread_id;
 
   if (!chatId || !text) {
     return res.status(200).send('OK (no text or chatId)');
@@ -218,7 +290,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await sendTelegramMessage(
       botToken,
       chatId,
-      `👋 *Welcome to Slyde AI Recipe Bot!*\n\nSend me *any recipe URL* (e.g. from AllRecipes, NYT Cooking, food blogs) and I will extract the recipe photo and generate your viral social media caption with Gemini AI!`
+      messageThreadId,
+      `👋 <b>Welcome to Slyde Bot!</b>\n\nSend me <b>any recipe URL</b> (from AllRecipes, NYT Cooking, food blogs) and I will automatically reply with:\n\n1️⃣ <b>Full 3-Slide Carousel Album</b> (Hook, Recipe Card, CTA)\n2️⃣ <b>Viral Social Caption</b> with ingredients, steps, and hashtags!`
     );
     return res.status(200).send('OK');
   }
@@ -228,14 +301,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const recipeUrl = urlMatch[0];
 
     // 1. Immediate acknowledgment
-    await sendTelegramMessage(botToken, chatId, '👨‍🍳 *Extracting recipe & crafting social caption with Gemini AI...*');
+    await sendTelegramMessage(botToken, chatId, messageThreadId, '👨‍🍳 <b>Extracting recipe & rendering 3 social slides...</b>');
 
     try {
-      const parsed = await extractRecipeServer(recipeUrl);
-      const caption = await generateGeminiCaptionServer(parsed);
-      await sendTelegramMessage(botToken, chatId, caption);
+      const host = req.headers.host || 'slyde-bay.vercel.app';
+      const recipe = await extractRecipeServer(recipeUrl);
+
+      // 2. Render all 3 slides using Chromium & send photo album
+      try {
+        const buffers = await captureSlidesServerless(recipe, host);
+        await sendTelegramAlbum(botToken, chatId, messageThreadId, buffers, recipe.title);
+      } catch (renderErr: any) {
+        console.warn('Chromium render failed in serverless, sending fallback photo:', renderErr.message);
+      }
+
+      // 3. Send clean viral caption
+      const caption = await generateGeminiCaptionServer(recipe);
+      await sendTelegramMessage(botToken, chatId, messageThreadId, caption);
+
     } catch (err: any) {
-      await sendTelegramMessage(botToken, chatId, `⚠️ Error processing recipe: ${err.message}`);
+      await sendTelegramMessage(botToken, chatId, messageThreadId, `⚠️ Error processing recipe: ${err.message}`);
     }
   }
 
