@@ -1373,7 +1373,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 
 .slide-2 {
   background: var(--bg-dark);
-  padding: 72px 12px 90px 12px;
+  padding: 60px 12px 75px 12px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1607,9 +1607,9 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 
 .step-text,
 .step-instruction-text {
-  font-size: calc(0.76rem * var(--font-scale, 1));
+  font-size: calc(0.72rem * var(--font-scale, 1));
   color: #111827 !important;
-  line-height: 1.18;
+  line-height: 1.15;
   font-weight: 700;
   flex: 1;
   word-break: break-word;
@@ -1629,48 +1629,48 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 /* Micro & Compact Density Enhancements for 5-6+ Steps */
 .density-micro .method-list,
 .density-compact .method-list {
-  gap: 2.5px;
+  gap: 2px;
 }
 
 .density-micro .method-step-item,
 .density-compact .method-step-item {
-  padding: 3px 5px;
-  gap: 5px;
-  border-radius: 5.5px;
+  padding: 2.5px 5px;
+  gap: 4.5px;
+  border-radius: 5px;
 }
 
 .density-micro .step-number-badge,
 .density-compact .step-number-badge {
-  width: 16px;
-  height: 16px;
-  font-size: 0.64rem;
+  width: 15px;
+  height: 15px;
+  font-size: 0.62rem;
   border-radius: 3px;
 }
 
 .density-micro .ingredients-grid,
 .density-compact .ingredients-grid {
-  gap: 2px 3.5px;
+  gap: 1.5px 3px;
 }
 
 .density-micro .ingredient-pill,
 .density-compact .ingredient-pill {
-  padding: 1.5px 4.5px;
-  min-height: 14px;
-  border-radius: 3.5px;
+  padding: 1.5px 4px;
+  min-height: 13px;
+  border-radius: 3px;
 }
 
 .density-micro .step-text,
 .density-compact .step-text {
-  font-size: calc(0.72rem * var(--font-scale, 1));
-  line-height: 1.16;
+  font-size: calc(0.67rem * var(--font-scale, 1));
+  line-height: 1.12;
   font-weight: 700;
   color: #111827 !important;
 }
 
 .density-micro .ing-text,
 .density-compact .ing-text {
-  font-size: calc(0.70rem * var(--font-scale, 1));
-  line-height: 1.12;
+  font-size: calc(0.65rem * var(--font-scale, 1));
+  line-height: 1.08;
   font-weight: 700;
   color: #111827 !important;
 }
