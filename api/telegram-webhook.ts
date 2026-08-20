@@ -340,7 +340,7 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
             };
           });
 
-          const totalDurationMs = 7000;
+          const totalDurationMs = 9000;
           const startTime = performance.now();
 
           recorder.start();
@@ -358,19 +358,19 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, 1080, 1920);
 
-            // Hook (0 - 2.0s), Recipe (2.0 - 5.5s), CTA (5.5 - 7.0s)
-            if (elapsedSec < 1.6) {
+            // Hook (0 - 2.5s), Recipe (2.5 - 7.2s), CTA (7.2 - 9.0s)
+            if (elapsedSec < 2.1) {
               ctx.drawImage(images[0], 0, 0, 1080, 1920);
-            } else if (elapsedSec < 2.0) {
-              const progress = (elapsedSec - 1.6) / 0.4;
+            } else if (elapsedSec < 2.5) {
+              const progress = (elapsedSec - 2.1) / 0.4;
               const ease = 1 - Math.pow(1 - progress, 3);
               const offsetX = ease * 1080;
               ctx.drawImage(images[0], -offsetX, 0, 1080, 1920);
               ctx.drawImage(images[1], 1080 - offsetX, 0, 1080, 1920);
-            } else if (elapsedSec < 5.1) {
+            } else if (elapsedSec < 6.8) {
               ctx.drawImage(images[1], 0, 0, 1080, 1920);
-            } else if (elapsedSec < 5.5) {
-              const progress = (elapsedSec - 5.1) / 0.4;
+            } else if (elapsedSec < 7.2) {
+              const progress = (elapsedSec - 6.8) / 0.4;
               const ease = 1 - Math.pow(1 - progress, 3);
               const offsetX = ease * 1080;
               ctx.drawImage(images[1], -offsetX, 0, 1080, 1920);
