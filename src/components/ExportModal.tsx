@@ -312,11 +312,19 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
       setBufferStatus({ loading: true, message: `Scheduling across ${bufferConfig.selectedProfileIds.length} channel(s)...` });
 
+      let isoScheduledAt: string | undefined = undefined;
+      if (bufferScheduleTime) {
+        const localDate = new Date(bufferScheduleTime);
+        if (!isNaN(localDate.getTime())) {
+          isoScheduledAt = localDate.toISOString();
+        }
+      }
+
       const res = await schedulePostToBuffer(
         bufferConfig,
         socialCaption,
         slideDataUrls[0] || recipe.heroImage,
-        bufferScheduleTime || undefined,
+        isoScheduledAt,
         recipe.title,
         slideDataUrls.length > 0 ? slideDataUrls : undefined,
         cachedCaptions.short,

@@ -303,9 +303,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           let postData = await postRes.json();
           let postPayload = postData.data?.createPost;
 
-          // If failed due to schedule time collision on queue/draft, retry cleanly as addToQueue without dueAt
+          // If failed due to schedule time collision or past date error, retry cleanly as addToQueue without dueAt
           const errorMsg = (postData.errors?.[0]?.message || postPayload?.message || '').toLowerCase();
-          if (!postPayload?.post?.id && errorMsg.includes('scheduled time should not be provided')) {
+          if (!postPayload?.post?.id && (errorMsg.includes('scheduled time') || errorMsg.includes('must be in the future') || errorMsg.includes('in the past') || errorMsg.includes('too soon'))) {
             delete input.dueAt;
             input.mode = 'addToQueue';
             input.schedulingType = 'automatic';
