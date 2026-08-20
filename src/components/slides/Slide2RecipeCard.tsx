@@ -49,16 +49,16 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
     }
   }
 
-  // Auto-fit font scaling so 100% of instructions and ingredients fit inside TikTok safe area
+  // Auto-fit font scaling with a large readable floor
   let autoFontScale = config.fontScale || 1.0;
   if (numSteps >= 6 || (numSteps >= 5 && totalChars > 450) || totalChars > 550) {
-    autoFontScale = Math.min(autoFontScale, 0.62);
+    autoFontScale = Math.min(autoFontScale, 0.80);
   } else if (numSteps >= 5 || totalChars > 380) {
-    autoFontScale = Math.min(autoFontScale, 0.67);
+    autoFontScale = Math.min(autoFontScale, 0.84);
   } else if (numSteps >= 4 || totalChars > 280) {
-    autoFontScale = Math.min(autoFontScale, 0.75);
+    autoFontScale = Math.min(autoFontScale, 0.90);
   } else if (totalChars > 180) {
-    autoFontScale = Math.min(autoFontScale, 0.85);
+    autoFontScale = Math.min(autoFontScale, 0.95);
   }
 
   // Background style based on cardStyle
