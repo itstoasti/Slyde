@@ -81,7 +81,7 @@ export const Slide1Hero: React.FC<Slide1HeroProps> = ({ recipe, theme, aspectRat
 
         {/* Hook Description Underneath Title */}
         <p className="hero-hook-text">
-          {recipe.shortHook}
+          {recipe.shortHook || `Better than takeout and ready in ${recipe.cookTime || recipe.prepTime}. ${recipe.ingredients.length} ingredients, ${recipe.method.length} steps.`}
         </p>
 
         {/* 4 Bottom Glassmorphic Macro Stat Cards */}

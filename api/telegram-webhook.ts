@@ -143,6 +143,8 @@ async function extractRecipeServer(recipeUrl: string) {
     heroImage: imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=1200&q=85',
     brandName,
     brandSubtitle: 'Save any recipe in one tap.',
+    shortHook: `Better than takeout and ready in ${cookTime || prepTime}. ${ingredients.length} ingredients, ${method.length} steps.`,
+    highlightBadge: `${(cookTime || prepTime).toUpperCase()} · ${servings} SERVINGS`,
     taglineBadge: `• ${brandName.toUpperCase()} · SKIP THE LIFE STORY`,
     brandPillBadge: 'AD-FREE · NO BLOG RANTS · JUST RECIPES',
     ctaButtonText: 'Get the app — free',
@@ -158,7 +160,7 @@ async function extractRecipeServer(recipeUrl: string) {
 }
 
 // Generate Social Media Caption with Gemini AI or OpenRouter
-async function generateAICaptionServer(recipeData: any) {
+async function generateAICaptionServer(recipeData: any): Promise<{ caption: string; hook: string }> {
   const openRouterKey = process.env.OPENROUTER_API_KEY || '';
   const openRouterModel = process.env.OPENROUTER_MODEL || 'openrouter/auto';
   const geminiKey = process.env.GEMINI_API_KEY || 'AIzaSyB8yOmrHTwl6Gp5xEVd_hyWsfnEipxN2Jc';
@@ -228,7 +230,7 @@ Return ONLY the one complete sentence.`;
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-zA-Z0-9]/g, '') || 'Recipe';
 
-  return `${recipeData.title} — ${hook}
+  const caption = `${recipeData.title} — ${hook}
 
 What you need:
 ${ingList}
@@ -240,7 +242,9 @@ Prep ${recipeData.prepTime} · Cook ${recipeData.cookTime} · Makes ${recipeData
 
 Save this recipe on ${brandName} — skip the life story, get straight to cooking. Get the app: ${ctaUrl}
 
-#${brandTag} #EasyRecipes #RecipeIdeas #HealthyEating #${firstWord}`.trim();
+#${brandTag} #EasyRecipes #RecipeIdeas #${firstWord}Recipes #${firstWord}`;
+
+  return { caption, hook };
 }
 
 // Render 3 Slides with Serverless Chromium
@@ -377,7 +381,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'slyde-bay.vercel.app';
       const recipe = await extractRecipeServer(recipeUrl);
 
-      // 2. Render all 3 slides using Chromium & send photo album
+      // 2. Generate viral AI caption & hook
+      const { caption, hook } = await generateAICaptionServer(recipe);
+      if (hook) {
+        recipe.shortHook = hook.replace(/🍽️/g, '').trim();
+      }
+
+      // 3. Render all 3 slides using Chromium & send photo album
       try {
         const buffers = await captureSlidesServerless(recipe, host);
         await sendTelegramAlbum(botToken, chatId, messageThreadId, buffers, recipe.title);
@@ -385,8 +395,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.warn('Chromium render failed in serverless, sending fallback photo:', renderErr.message);
       }
 
-      // 3. Send clean viral caption
-      const caption = await generateAICaptionServer(recipe);
+      // 4. Send clean viral caption
       await sendTelegramMessage(botToken, chatId, messageThreadId, caption);
 
     } catch (err: any) {
