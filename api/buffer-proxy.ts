@@ -248,17 +248,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             text: postText,
             mode: effectiveMode,
             needsApproval: false,
-            saveToDraft: !!shouldDraft,
-            metadata: {
+            saveToDraft: !!shouldDraft
+          };
+
+          // Attach platform-specific metadata ONLY for the matching service
+          if (svc.includes('tiktok')) {
+            input.metadata = {
               tiktok: {
                 title: title || (postText ? postText.split('\n')[0].substring(0, 90) : 'Recipe')
-              },
+              }
+            };
+          } else if (isYouTube) {
+            input.metadata = {
               youtube: {
                 title: title || (postText ? postText.split('\n')[0].substring(0, 60) : 'Recipe'),
-                privacy: (isYouTube && youtubeAsDraft) ? 'private' : 'public'
+                category: 'Howto & Style',
+                privacy: (isYouTube && youtubeAsDraft) ? 'private' : 'public',
+                madeForKids: false
               }
-            }
-          };
+            };
+          }
 
           // Never provide dueAt when adding to queue or drafting (Buffer calculates queue time automatically)
           if (effectiveMode === 'customScheduled' && dueAt) {
