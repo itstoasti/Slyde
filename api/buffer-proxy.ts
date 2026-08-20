@@ -141,7 +141,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             const litterUrl = (await res.text()).trim();
             if (litterUrl && litterUrl.startsWith('http')) {
-              return `https://wsrv.nl/?url=${encodeURIComponent(litterUrl)}&output=png`;
+              return litterUrl;
             }
           } catch (e) {}
 
@@ -166,10 +166,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // If standard http/https web URL
         if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-          if (trimmed.includes('wsrv.nl') || trimmed.includes('images.unsplash.com') || trimmed.includes('iili.io')) {
-            return trimmed;
-          }
-          return `https://wsrv.nl/?url=${encodeURIComponent(trimmed)}&output=jpg`;
+          return trimmed;
         }
         return null;
       };
@@ -381,10 +378,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             postPayload = postData.data?.createPost;
           }
 
-          // If failed due to image read error and not TikTok, retry without invalid asset
+          // If failed due to image read error and platform allows text-only (e.g. Threads/X), retry without invalid asset
           if (
             !postPayload?.post?.id &&
             !svc.includes('tiktok') &&
+            !svc.includes('instagram') &&
+            !isYouTube &&
             (postData.errors?.[0]?.message?.toLowerCase().includes('image') ||
              postPayload?.message?.toLowerCase().includes('image')) &&
             input.assets

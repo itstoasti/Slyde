@@ -300,24 +300,22 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
       const uploadBlobToPublicHost = async (blob: Blob, filename: string): Promise<string | null> => {
         try {
-          const formData = new FormData();
-          formData.append('reqtype', 'fileupload');
-          formData.append('time', '72h');
-          formData.append('fileToUpload', blob, filename);
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 25000);
-          const res = await fetch('https://litterbox.catbox.moe/resources/internals/api.php', {
-            method: 'POST',
-            body: formData,
-            signal: controller.signal
+          const dataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
           });
-          clearTimeout(timeoutId);
-          const url = (await res.text()).trim();
-          if (url && url.startsWith('http')) {
-            return url;
+          const res = await fetch('/api/upload-media', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dataUrl, filename })
+          });
+          const json = await res.json();
+          if (json?.success && json?.url) {
+            return json.url;
           }
         } catch (e) {
-          console.warn('Direct upload error', e);
+          console.warn('Upload media error', e);
         }
         return null;
       };
