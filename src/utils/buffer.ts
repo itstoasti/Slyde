@@ -81,7 +81,8 @@ export async function schedulePostToBuffer(
   mediaUrls?: string[],
   shortCaption?: string,
   longCaption?: string,
-  scheduleModeOverride?: 'now' | 'queue' | 'custom'
+  scheduleModeOverride?: 'now' | 'queue' | 'custom',
+  videoUrl?: string
 ): Promise<BufferScheduleResult> {
   const token = config.accessToken.trim();
   const profileIds = config.selectedProfileIds || [];
@@ -117,6 +118,7 @@ export async function schedulePostToBuffer(
         title,
         mediaUrl,
         mediaUrls,
+        videoUrl,
         scheduledAt: effectiveScheduleMode === 'custom' ? scheduledAt : undefined,
         scheduleMode: effectiveScheduleMode,
         youtubeAsDraft: config.youtubeAsDraft ?? true,

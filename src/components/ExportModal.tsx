@@ -310,6 +310,21 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         }
       }
 
+      const hasYouTube = bufferConfig.profiles?.some(
+        p => p.service.toLowerCase().includes('youtube') && bufferConfig.selectedProfileIds?.includes(p.id)
+      );
+
+      let videoDataUrl: string | undefined = undefined;
+      if (hasYouTube && elements.length > 0) {
+        setBufferStatus({ loading: true, message: 'Rendering 60 FPS video for YouTube Shorts...' });
+        const videoBlob = await createSlideshowVideo(elements, [2.5, 5.0, 1.5]);
+        videoDataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(videoBlob);
+        });
+      }
+
       setBufferStatus({ loading: true, message: `Dispatching across ${bufferConfig.selectedProfileIds.length} channel(s)...` });
 
       let isoScheduledAt: string | undefined = undefined;
@@ -329,7 +344,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         slideDataUrls.length > 0 ? slideDataUrls : undefined,
         cachedCaptions.short,
         cachedCaptions.long,
-        overrideMode
+        overrideMode,
+        videoDataUrl
       );
 
       setBufferStatus({ loading: false, message: res.message, success: res.success });

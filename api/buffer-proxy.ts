@@ -6,7 +6,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { action, token, profileIds = [], channels = [], caption, shortCaption, longCaption, title, mediaUrl, mediaUrls = [], scheduledAt, scheduleMode = 'queue', youtubeAsDraft = true, postAsDraft = false } = req.body || {};
+    const { action, token, profileIds = [], channels = [], caption, shortCaption, longCaption, title, mediaUrl, mediaUrls = [], videoUrl, scheduledAt, scheduleMode = 'queue', youtubeAsDraft = true, postAsDraft = false } = req.body || {};
     const cleanToken = (token || '').trim();
 
     if (!cleanToken) {
@@ -174,6 +174,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return null;
       };
 
+      const resolvePublicVideoUrl = async (rawUrl?: string): Promise<string | null> => {
+        if (!rawUrl || typeof rawUrl !== 'string') return null;
+        const trimmed = rawUrl.trim();
+        if (!trimmed) return null;
+
+        if (trimmed.startsWith('data:video/')) {
+          try {
+            const match = trimmed.match(/^data:video\/(\w+);base64,(.+)$/);
+            const ext = match ? (match[1] === 'mp4' ? 'mp4' : 'webm') : 'mp4';
+            const b64Data = match ? match[2] : trimmed;
+            const buffer = Buffer.from(b64Data, 'base64');
+            const formData = new FormData();
+            const blob = new Blob([buffer], { type: `video/${ext}` });
+            formData.append('reqtype', 'fileupload');
+            formData.append('time', '72h');
+            formData.append('fileToUpload', blob, `recipe-video.${ext}`);
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 20000);
+            const res = await fetch('https://litterbox.catbox.moe/resources/internals/api.php', {
+              method: 'POST',
+              body: formData,
+              signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+
+            const litterUrl = (await res.text()).trim();
+            if (litterUrl && litterUrl.startsWith('http')) {
+              return litterUrl;
+            }
+          } catch (e) {}
+          return null;
+        }
+
+        if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+          return trimmed;
+        }
+        return null;
+      };
+
+      let resolvedVideoUrl: string | null = null;
+      if (videoUrl) {
+        resolvedVideoUrl = await resolvePublicVideoUrl(videoUrl);
+      }
+
       let commonAssets: any[] | undefined = undefined;
       if (Array.isArray(mediaUrls) && mediaUrls.length > 0) {
         const resolvedList = await Promise.all(mediaUrls.map((u, idx) => resolvePublicImageUrl(u, idx)));
@@ -251,7 +296,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           };
 
           // Attach platform-specific metadata ONLY for the matching service
-          if (svc.includes('tiktok')) {
+          if (svc.includes('instagram')) {
+            input.metadata = {
+              instagram: {
+                type: 'post'
+              }
+            };
+          } else if (svc.includes('tiktok')) {
             input.metadata = {
               tiktok: {
                 title: title || (postText ? postText.split('\n')[0].substring(0, 90) : 'Recipe')
@@ -283,9 +334,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             delete input.dueAt;
           }
 
-          // Attach image assets to platforms that support them (Instagram, Threads, TikTok, etc.)
-          // YouTube does NOT accept image assets in Buffer — omit assets for YouTube
-          if (!isYouTube && commonAssets && commonAssets.length > 0) {
+          // Attach assets: Video for YouTube, Images for Instagram/Threads/TikTok
+          if (isYouTube) {
+            if (resolvedVideoUrl) {
+              input.assets = [{ video: { url: resolvedVideoUrl } }];
+            } else {
+              delete input.assets;
+            }
+          } else if (commonAssets && commonAssets.length > 0) {
             input.assets = commonAssets;
           }
 
