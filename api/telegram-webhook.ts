@@ -250,7 +250,7 @@ Save this recipe on ${brandName} — skip the life story, get straight to cookin
   return { caption, hook };
 }
 
-// Render 3 Slides and 60 FPS Video with Serverless Chromium
+// Render 3 Slides with Serverless Chromium, then stitch video with ffmpeg
 async function captureMediaServerless(recipe: any, host: string, includeVideo: boolean = true): Promise<{ slides: (Buffer | Uint8Array)[]; videoBuffer: Buffer | null; videoError?: string | null }> {
   let executablePath: string;
   try {
@@ -297,113 +297,20 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
       slide3El.screenshot({ type: 'png' })
     ]);
 
+    await browser.close();
+
     let videoBuffer: Buffer | null = null;
     let videoError: string | null = null;
+
     if (includeVideo) {
       try {
-        const imgB64List = [buf1.toString('base64'), buf2.toString('base64'), buf3.toString('base64')];
-
-        const videoBase64 = await page.evaluate(async (b64Images) => {
-          try {
-            const images = await Promise.all(b64Images.map(src => new Promise<HTMLImageElement>(resolve => {
-              const img = new Image();
-              img.onload = () => resolve(img);
-              img.onerror = () => resolve(img);
-              img.src = 'data:image/png;base64,' + src;
-            })));
-
-            const canvas = document.createElement('canvas');
-            canvas.width = 1080;
-            canvas.height = 1920;
-            document.body.appendChild(canvas);
-            const ctx = canvas.getContext('2d', { alpha: false })!;
-
-            const stream = canvas.captureStream(30);
-            let mimeType = 'video/webm;codecs=vp8';
-            if (!MediaRecorder.isTypeSupported(mimeType)) {
-              mimeType = 'video/webm';
-            }
-
-            const recorder = new MediaRecorder(stream, {
-              mimeType,
-              videoBitsPerSecond: 4500000
-            });
-            const chunks: Blob[] = [];
-            recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-
-            const done = new Promise<string>((resolve, reject) => {
-              recorder.onstop = () => {
-                const blob = new Blob(chunks, { type: mimeType });
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result as string);
-                reader.onerror = () => reject(new Error('FileReader error'));
-                reader.readAsDataURL(blob);
-              };
-            });
-
-            const totalDurationMs = 8000; // 8.0s total pacing for fast mobile Shorts
-            const startTime = performance.now();
-
-            recorder.start();
-
-            const interval = setInterval(() => {
-              const elapsedMs = performance.now() - startTime;
-              if (elapsedMs >= totalDurationMs) {
-                clearInterval(interval);
-                recorder.stop();
-                return;
-              }
-
-              const elapsedSec = elapsedMs / 1000;
-
-              ctx.fillStyle = '#000000';
-              ctx.fillRect(0, 0, 1080, 1920);
-
-              // Hook (0 - 2.2s), Recipe (2.2 - 6.2s), CTA (6.2 - 8.0s)
-              if (elapsedSec < 1.8) {
-                ctx.drawImage(images[0], 0, 0, 1080, 1920);
-              } else if (elapsedSec < 2.2) {
-                const progress = (elapsedSec - 1.8) / 0.4;
-                const ease = 1 - Math.pow(1 - progress, 3);
-                const offsetX = ease * 1080;
-                ctx.drawImage(images[0], -offsetX, 0, 1080, 1920);
-                ctx.drawImage(images[1], 1080 - offsetX, 0, 1080, 1920);
-              } else if (elapsedSec < 5.8) {
-                ctx.drawImage(images[1], 0, 0, 1080, 1920);
-              } else if (elapsedSec < 6.2) {
-                const progress = (elapsedSec - 5.8) / 0.4;
-                const ease = 1 - Math.pow(1 - progress, 3);
-                const offsetX = ease * 1080;
-                ctx.drawImage(images[1], -offsetX, 0, 1080, 1920);
-                ctx.drawImage(images[2], 1080 - offsetX, 0, 1080, 1920);
-              } else {
-                ctx.drawImage(images[2], 0, 0, 1080, 1920);
-              }
-            }, 33);
-
-            return await done;
-          } catch (e: any) {
-            return 'ERROR:' + (e.message || String(e));
-          }
-        }, imgB64List);
-
-        if (videoBase64) {
-          if (videoBase64.startsWith('ERROR:')) {
-            videoError = videoBase64;
-          } else {
-            const match = videoBase64.match(/^data:video\/[a-zA-Z0-9_-]+;base64,(.+)$/);
-            if (match) {
-              videoBuffer = Buffer.from(match[1], 'base64');
-            }
-          }
-        }
+        videoBuffer = await generateVideoFromSlideBuffers(buf1, buf2, buf3);
       } catch (vidErr: any) {
-        console.warn('Video generation error in serverless:', vidErr.message);
+        console.warn('Video generation error:', vidErr.message);
         videoError = vidErr.message;
       }
     }
 
-    await browser.close();
     return {
       slides: [buf1, buf2, buf3],
       videoBuffer,
@@ -412,6 +319,74 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
   } catch (err) {
     await browser.close();
     throw err;
+  }
+}
+
+// Generate MP4 video from 3 slide PNG buffers using ffmpeg
+async function generateVideoFromSlideBuffers(buf1: Buffer | Uint8Array, buf2: Buffer | Uint8Array, buf3: Buffer | Uint8Array): Promise<Buffer> {
+  const { execFileSync } = await import('child_process');
+  const fs = await import('fs');
+  const path = await import('path');
+
+  // Get ffmpeg binary path
+  let ffmpegPath: string;
+  try {
+    const ffmpegInstaller = await import('@ffmpeg-installer/ffmpeg');
+    ffmpegPath = (ffmpegInstaller as any).default?.path || (ffmpegInstaller as any).path;
+  } catch {
+    ffmpegPath = 'ffmpeg'; // fallback to system ffmpeg
+  }
+
+  const tmpDir = '/tmp';
+  const slide1Path = path.join(tmpDir, `slide1_${Date.now()}.png`);
+  const slide2Path = path.join(tmpDir, `slide2_${Date.now()}.png`);
+  const slide3Path = path.join(tmpDir, `slide3_${Date.now()}.png`);
+  const clip1Path = path.join(tmpDir, `clip1_${Date.now()}.mp4`);
+  const clip2Path = path.join(tmpDir, `clip2_${Date.now()}.mp4`);
+  const clip3Path = path.join(tmpDir, `clip3_${Date.now()}.mp4`);
+  const concatPath = path.join(tmpDir, `concat_${Date.now()}.txt`);
+  const outputPath = path.join(tmpDir, `video_${Date.now()}.mp4`);
+
+  try {
+    // Write slide PNGs to /tmp
+    fs.writeFileSync(slide1Path, buf1);
+    fs.writeFileSync(slide2Path, buf2);
+    fs.writeFileSync(slide3Path, buf3);
+
+    // Create individual clips: Hook 2.5s, Recipe 4.5s, CTA 2.0s = 9.0s total
+    const clips = [
+      { input: slide1Path, duration: '2.5', output: clip1Path },
+      { input: slide2Path, duration: '4.5', output: clip2Path },
+      { input: slide3Path, duration: '2.0', output: clip3Path },
+    ];
+
+    for (const clip of clips) {
+      execFileSync(ffmpegPath, [
+        '-y', '-loop', '1', '-t', clip.duration, '-i', clip.input,
+        '-vf', 'scale=1080:1920,format=yuv420p',
+        '-c:v', 'libx264', '-r', '30', '-preset', 'ultrafast', '-crf', '23',
+        clip.output
+      ], { stdio: 'pipe', timeout: 20000 });
+    }
+
+    // Write concat list
+    fs.writeFileSync(concatPath, clips.map(c => `file '${c.output}'`).join('\n'));
+
+    // Concat clips into final video
+    execFileSync(ffmpegPath, [
+      '-y', '-f', 'concat', '-safe', '0', '-i', concatPath,
+      '-c', 'copy', outputPath
+    ], { stdio: 'pipe', timeout: 15000 });
+
+    // Read the final MP4
+    const videoBuffer = fs.readFileSync(outputPath);
+    return Buffer.from(videoBuffer);
+  } finally {
+    // Cleanup temp files
+    const tempFiles = [slide1Path, slide2Path, slide3Path, clip1Path, clip2Path, clip3Path, concatPath, outputPath];
+    for (const f of tempFiles) {
+      try { fs.unlinkSync(f); } catch {}
+    }
   }
 }
 
