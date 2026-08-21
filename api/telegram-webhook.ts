@@ -298,91 +298,98 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
       try {
         const imgB64List = [buf1.toString('base64'), buf2.toString('base64'), buf3.toString('base64')];
 
-        const videoPage = await browser.newPage();
-        await videoPage.setViewport({ width: 1080, height: 1920 });
+        const videoBase64 = await page.evaluate(async (b64Images) => {
+          try {
+            const images = await Promise.all(b64Images.map(src => new Promise<HTMLImageElement>(resolve => {
+              const img = new Image();
+              img.onload = () => resolve(img);
+              img.onerror = () => resolve(img);
+              img.src = 'data:image/png;base64,' + src;
+            })));
 
-        const videoBase64 = await videoPage.evaluate(async (b64Images) => {
-          const images = await Promise.all(b64Images.map(src => new Promise<HTMLImageElement>(resolve => {
-            const img = new Image();
-            img.onload = () => resolve(img);
-            img.src = 'data:image/png;base64,' + src;
-          })));
+            const canvas = document.createElement('canvas');
+            canvas.width = 1080;
+            canvas.height = 1920;
+            document.body.appendChild(canvas);
+            const ctx = canvas.getContext('2d', { alpha: false })!;
 
-          const canvas = document.createElement('canvas');
-          canvas.width = 1080;
-          canvas.height = 1920;
-          document.body.appendChild(canvas);
-          const ctx = canvas.getContext('2d', { alpha: false })!;
+            const stream = canvas.captureStream(30);
+            let mimeType = 'video/webm;codecs=vp8';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+              mimeType = 'video/webm';
+            }
 
-          const stream = canvas.captureStream(30);
-          let mimeType = 'video/webm;codecs=vp8';
-          if (!MediaRecorder.isTypeSupported(mimeType)) {
-            mimeType = 'video/webm';
+            const recorder = new MediaRecorder(stream, {
+              mimeType,
+              videoBitsPerSecond: 4500000
+            });
+            const chunks: Blob[] = [];
+            recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+            const done = new Promise<string>((resolve, reject) => {
+              recorder.onstop = () => {
+                const blob = new Blob(chunks, { type: mimeType });
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.onerror = () => reject(new Error('FileReader error'));
+                reader.readAsDataURL(blob);
+              };
+            });
+
+            const totalDurationMs = 8000; // 8.0s total pacing for fast mobile Shorts
+            const startTime = performance.now();
+
+            recorder.start();
+
+            const interval = setInterval(() => {
+              const elapsedMs = performance.now() - startTime;
+              if (elapsedMs >= totalDurationMs) {
+                clearInterval(interval);
+                recorder.stop();
+                return;
+              }
+
+              const elapsedSec = elapsedMs / 1000;
+
+              ctx.fillStyle = '#000000';
+              ctx.fillRect(0, 0, 1080, 1920);
+
+              // Hook (0 - 2.2s), Recipe (2.2 - 6.2s), CTA (6.2 - 8.0s)
+              if (elapsedSec < 1.8) {
+                ctx.drawImage(images[0], 0, 0, 1080, 1920);
+              } else if (elapsedSec < 2.2) {
+                const progress = (elapsedSec - 1.8) / 0.4;
+                const ease = 1 - Math.pow(1 - progress, 3);
+                const offsetX = ease * 1080;
+                ctx.drawImage(images[0], -offsetX, 0, 1080, 1920);
+                ctx.drawImage(images[1], 1080 - offsetX, 0, 1080, 1920);
+              } else if (elapsedSec < 5.8) {
+                ctx.drawImage(images[1], 0, 0, 1080, 1920);
+              } else if (elapsedSec < 6.2) {
+                const progress = (elapsedSec - 5.8) / 0.4;
+                const ease = 1 - Math.pow(1 - progress, 3);
+                const offsetX = ease * 1080;
+                ctx.drawImage(images[1], -offsetX, 0, 1080, 1920);
+                ctx.drawImage(images[2], 1080 - offsetX, 0, 1080, 1920);
+              } else {
+                ctx.drawImage(images[2], 0, 0, 1080, 1920);
+              }
+            }, 33);
+
+            return await done;
+          } catch (e: any) {
+            return 'ERROR:' + (e.message || String(e));
           }
-
-          const recorder = new MediaRecorder(stream, {
-            mimeType,
-            videoBitsPerSecond: 4500000
-          });
-          const chunks: Blob[] = [];
-          recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-
-          const done = new Promise<string>(resolve => {
-            recorder.onstop = () => {
-              const blob = new Blob(chunks, { type: mimeType });
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result as string);
-              reader.readAsDataURL(blob);
-            };
-          });
-
-          const totalDurationMs = 9000;
-          const startTime = performance.now();
-
-          recorder.start();
-
-          const interval = setInterval(() => {
-            const elapsedMs = performance.now() - startTime;
-            if (elapsedMs >= totalDurationMs) {
-              clearInterval(interval);
-              recorder.stop();
-              return;
-            }
-
-            const elapsedSec = elapsedMs / 1000;
-
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, 1080, 1920);
-
-            // Hook (0 - 2.5s), Recipe (2.5 - 7.2s), CTA (7.2 - 9.0s)
-            if (elapsedSec < 2.1) {
-              ctx.drawImage(images[0], 0, 0, 1080, 1920);
-            } else if (elapsedSec < 2.5) {
-              const progress = (elapsedSec - 2.1) / 0.4;
-              const ease = 1 - Math.pow(1 - progress, 3);
-              const offsetX = ease * 1080;
-              ctx.drawImage(images[0], -offsetX, 0, 1080, 1920);
-              ctx.drawImage(images[1], 1080 - offsetX, 0, 1080, 1920);
-            } else if (elapsedSec < 6.8) {
-              ctx.drawImage(images[1], 0, 0, 1080, 1920);
-            } else if (elapsedSec < 7.2) {
-              const progress = (elapsedSec - 6.8) / 0.4;
-              const ease = 1 - Math.pow(1 - progress, 3);
-              const offsetX = ease * 1080;
-              ctx.drawImage(images[1], -offsetX, 0, 1080, 1920);
-              ctx.drawImage(images[2], 1080 - offsetX, 0, 1080, 1920);
-            } else {
-              ctx.drawImage(images[2], 0, 0, 1080, 1920);
-            }
-          }, 33);
-
-          return done;
         }, imgB64List);
 
         if (videoBase64) {
-          const match = videoBase64.match(/^data:video\/[a-zA-Z0-9_-]+;base64,(.+)$/);
-          if (match) {
-            videoBuffer = Buffer.from(match[1], 'base64');
+          if (videoBase64.startsWith('ERROR:')) {
+            videoError = videoBase64;
+          } else {
+            const match = videoBase64.match(/^data:video\/[a-zA-Z0-9_-]+;base64,(.+)$/);
+            if (match) {
+              videoBuffer = Buffer.from(match[1], 'base64');
+            }
           }
         }
       } catch (vidErr: any) {
