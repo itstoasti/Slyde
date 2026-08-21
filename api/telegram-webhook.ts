@@ -251,7 +251,7 @@ Save this recipe on ${brandName} — skip the life story, get straight to cookin
 }
 
 // Render 3 Slides and 60 FPS Video with Serverless Chromium
-async function captureMediaServerless(recipe: any, host: string, includeVideo: boolean = true): Promise<{ slides: (Buffer | Uint8Array)[]; videoBuffer: Buffer | null }> {
+async function captureMediaServerless(recipe: any, host: string, includeVideo: boolean = true): Promise<{ slides: (Buffer | Uint8Array)[]; videoBuffer: Buffer | null; videoError?: string | null }> {
   let executablePath: string;
   try {
     executablePath = await chromium.executablePath();
@@ -293,6 +293,7 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
     ]);
 
     let videoBuffer: Buffer | null = null;
+    let videoError: string | null = null;
     if (includeVideo) {
       try {
         const imgB64List = [buf1.toString('base64'), buf2.toString('base64'), buf3.toString('base64')];
@@ -313,34 +314,13 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
           document.body.appendChild(canvas);
           const ctx = canvas.getContext('2d', { alpha: false })!;
 
-          // Generate silent audio track for YouTube / iOS audio mixing compatibility
-          let audioTracks: MediaStreamTrack[] = [];
-          let audioCtx: any = null;
-          let osc: any = null;
-          try {
-            audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-            const dest = audioCtx.createMediaStreamDestination();
-            osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            gain.gain.value = 0.0001; // Silent
-            osc.connect(gain);
-            gain.connect(dest);
-            osc.start();
-            audioTracks = dest.stream.getAudioTracks();
-          } catch (e) {}
-
-          const canvasStream = canvas.captureStream(30);
-          const combinedStream = new MediaStream([
-            ...canvasStream.getVideoTracks(),
-            ...audioTracks
-          ]);
-
-          let mimeType = 'video/webm;codecs=vp8,opus';
+          const stream = canvas.captureStream(30);
+          let mimeType = 'video/webm;codecs=vp8';
           if (!MediaRecorder.isTypeSupported(mimeType)) {
             mimeType = 'video/webm';
           }
 
-          const recorder = new MediaRecorder(combinedStream, {
+          const recorder = new MediaRecorder(stream, {
             mimeType,
             videoBitsPerSecond: 4500000
           });
@@ -366,8 +346,6 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
             if (elapsedMs >= totalDurationMs) {
               clearInterval(interval);
               recorder.stop();
-              try { if (osc) osc.stop(); } catch (e) {}
-              try { if (audioCtx) audioCtx.close(); } catch (e) {}
               return;
             }
 
@@ -409,13 +387,15 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
         }
       } catch (vidErr: any) {
         console.warn('Video generation error in serverless:', vidErr.message);
+        videoError = vidErr.message;
       }
     }
 
     await browser.close();
     return {
       slides: [buf1, buf2, buf3],
-      videoBuffer
+      videoBuffer,
+      videoError
     };
   } catch (err) {
     await browser.close();
@@ -591,11 +571,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const media = await captureMediaServerless(recipe, host, needsVideo);
 
           // Send Video if requested
-          if (media.videoBuffer && (isVideoOnly || !isSlidesOnly)) {
-            const vidRes = await sendTelegramVideo(botToken, chatId, messageThreadId, media.videoBuffer, recipe.title);
-            if (vidRes && !vidRes.ok) {
-              console.warn('Telegram sendVideo error:', vidRes.description);
-              await sendTelegramMessage(botToken, chatId, messageThreadId, `⚠️ Video delivery note: ${vidRes.description}`);
+          if (isVideoOnly || !isSlidesOnly) {
+            if (media.videoBuffer) {
+              const vidRes = await sendTelegramVideo(botToken, chatId, messageThreadId, media.videoBuffer, recipe.title);
+              if (vidRes && !vidRes.ok) {
+                console.warn('Telegram sendVideo error:', vidRes.description);
+                await sendTelegramMessage(botToken, chatId, messageThreadId, `⚠️ Video delivery note: ${vidRes.description}`);
+              }
+            } else {
+              const reason = media.videoError || 'Unknown rendering timeout';
+              await sendTelegramMessage(botToken, chatId, messageThreadId, `⚠️ Video generation issue: ${reason}`);
             }
           }
 
