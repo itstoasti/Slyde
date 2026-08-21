@@ -272,11 +272,16 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
     const renderUrl = cleanHost.includes('localhost') ? `http://${cleanHost}/render.html` : `https://${cleanHost}/render.html`;
     await page.goto(renderUrl, { waitUntil: 'networkidle0', timeout: 18000 });
 
+    await page.waitForFunction(() => typeof (window as any).__setRecipe === 'function', { timeout: 12000 });
+
     await page.evaluate((r) => {
       (window as any).__setRecipe(r);
     }, recipe);
 
-    await new Promise(r => setTimeout(r, 800));
+    await page.waitForSelector('#slide-1', { timeout: 12000 });
+    await page.waitForSelector('#slide-2', { timeout: 12000 });
+    await page.waitForSelector('#slide-3', { timeout: 12000 });
+    await new Promise(r => setTimeout(r, 600));
 
     const slide1El = await page.$('#slide-1');
     const slide2El = await page.$('#slide-2');

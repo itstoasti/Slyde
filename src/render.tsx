@@ -14,13 +14,63 @@ declare global {
   }
 }
 
+const normalizeRecipe = (r: any): RecipeData => {
+  const base = RECIPE_PRESETS[0];
+  if (!r) return base;
+
+  // Format ingredients to { name, amount }
+  let formattedIngs = base.ingredients;
+  if (Array.isArray(r.ingredients) && r.ingredients.length > 0) {
+    formattedIngs = r.ingredients.map((ing: any) => {
+      if (typeof ing === 'string') {
+        const parts = ing.trim().split(' ');
+        if (parts.length > 1 && /^[\d/.-]+/.test(parts[0])) {
+          return { amount: parts.slice(0, 2).join(' '), name: parts.slice(2).join(' ') || parts[1] };
+        }
+        return { amount: '1 item', name: ing };
+      }
+      return { name: ing.name || 'Ingredient', amount: ing.amount || '' };
+    });
+  }
+
+  // Format method/instructions to string[]
+  let formattedMethod = base.method;
+  if (Array.isArray(r.method) && r.method.length > 0) {
+    formattedMethod = r.method;
+  } else if (Array.isArray(r.instructions) && r.instructions.length > 0) {
+    formattedMethod = r.instructions;
+  }
+
+  return {
+    ...base,
+    ...r,
+    title: r.title || base.title,
+    shortHook: r.shortHook || base.shortHook,
+    taglineBadge: r.taglineBadge || base.taglineBadge || 'EASY RECIPE',
+    heroImage: r.heroImage || r.image || base.heroImage,
+    prepTime: r.prepTime || base.prepTime || '10m',
+    cookTime: r.cookTime || base.cookTime || '20m',
+    servings: r.servings || base.servings || '4',
+    calories: r.calories || base.calories || '350 cal',
+    ingredients: formattedIngs,
+    method: formattedMethod,
+    brandName: r.brandName || base.brandName,
+    brandSubtitle: r.brandSubtitle || base.brandSubtitle,
+    brandPillBadge: r.brandPillBadge || base.brandPillBadge,
+    ctaButtonText: r.ctaButtonText || base.ctaButtonText,
+    ctaUrl: r.ctaUrl || base.ctaUrl,
+    socialHandle: r.socialHandle || base.socialHandle,
+    perks: Array.isArray(r.perks) && r.perks.length > 0 ? r.perks : base.perks,
+  };
+};
+
 const RenderApp: React.FC = () => {
   const [recipe, setRecipe] = useState<RecipeData>(RECIPE_PRESETS[0]);
   const [theme, setTheme] = useState<ThemeConfig>(THEME_PRESETS.caramel);
 
   useEffect(() => {
-    window.__setRecipe = (newRecipe: RecipeData, newTheme?: ThemeConfig) => {
-      setRecipe(newRecipe);
+    window.__setRecipe = (newRecipe: any, newTheme?: ThemeConfig) => {
+      setRecipe(normalizeRecipe(newRecipe));
       if (newTheme) setTheme(newTheme);
       window.__isReady = true;
     };

@@ -23,6 +23,7 @@
     "html-to-image": "^1.11.11",
     "jszip": "^3.10.1",
     "lucide-react": "^1.16.0",
+    "pngjs": "^7.0.0",
     "puppeteer-core": "^25.8.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
@@ -30,6 +31,7 @@
   "devDependencies": {
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^22.13.4",
+    "@types/pngjs": "^6.0.5",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vercel/node": "^5.10.1",
