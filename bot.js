@@ -23,7 +23,7 @@ const RECIPES_FILE = path.join(__dirname, 'recipes_queue.json');
 const CHROME_PATH = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
 function loadTelegramConfig() {
-  let token = '8436957773:AAGA7rl6VLtUnAEU2vNTFzv_IhZwA-xSWCk';
+  let token = process.env.TELEGRAM_BOT_TOKEN || '';
   let chatId = '@Claaaaaarkbot';
 
   if (fs.existsSync(CONFIG_FILE)) {

@@ -480,7 +480,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).send('Slyde Telegram Webhook Endpoint');
   }
 
-  const botToken = process.env.TELEGRAM_BOT_TOKEN || '8436957773:AAGA7rl6VLtUnAEU2vNTFzv_IhZwA-xSWCk';
+  const botToken = process.env.TELEGRAM_BOT_TOKEN || '8436957773:AAHIDTS-uDg6Kv8brHhMK5UYBxkHy3dewzk';
+
+  // Allowed chat IDs — only these chats can use the bot (if configured)
+  const allowedChatIdsStr = process.env.ALLOWED_CHAT_IDS || '';
+  const allowedChatIds = new Set(allowedChatIdsStr.split(',').map(s => s.trim()).filter(Boolean));
+
   const update = req.body;
   if (!update) {
     return res.status(200).send('OK (no update)');
@@ -511,12 +516,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).send('OK (no text or chatId)');
   }
 
+  // Security: reject messages from unauthorized chats (if allowlist is configured)
+  if (allowedChatIds.size > 0 && !allowedChatIds.has(String(chatId))) {
+    console.warn(`Rejected message from unauthorized chat ${chatId}`);
+    return res.status(200).send('OK (unauthorized)');
+  }
+
   if (text.startsWith('/start') || text.startsWith('/help')) {
     await sendTelegramMessage(
       botToken,
       chatId,
       messageThreadId,
-      `🎬 <b>Welcome to Slyde Automation Bot!</b>\n\nSend me <b>any recipe URL</b> or use commands:\n\n🎥 <b>/video &lt;url&gt;</b> — 9.0s 9:16 Video (Ready for YouTube Shorts & TikTok)\n📸 <b>/slides &lt;url&gt;</b> — 3-Slide Carousel Album (Instagram & Threads)\n⚡ <b>/all &lt;url&gt;</b> (or paste any URL) — Both Video + 3 Slides + Caption\n📋 <b>/caption &lt;url&gt;</b> — Viral Social Caption only\n\n<i>💡 Tip: Tap and save the video directly to your phone camera roll to add trending sounds in the YouTube Shorts or TikTok app!</i>`
+      `🎬 <b>Welcome to Slyde Automation Bot!</b>\n\nSend me <b>any recipe URL</b> or use commands:\n\n🎥 <b>/video &lt;url&gt;</b> — 9.0s 9:16 Video (Ready for YouTube Shorts & TikTok)\n📸 <b>/slides &lt;url&gt;</b> — 3-Slide Carousel Album (Instagram & Threads)\n⚡ <b>/all &lt;url&gt;</b> (or paste any URL) — Both Video + 3 Slides + Caption\n📋 <b>/caption &lt;url&gt;</b> — Viral Social Caption only\n\n🆔 <i>Your Chat ID: <code>${chatId}</code></i>\n\n<i>💡 Tip: Tap and save the video directly to your phone camera roll to add trending sounds in the YouTube Shorts or TikTok app!</i>`
     );
     return res.status(200).send('OK');
   }

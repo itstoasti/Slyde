@@ -27,3 +27,8 @@ bot.log
 *.sln
 *.sw?
 .vite/
+
+# Secrets and config
+.env
+.env.*
+telegram_config.json
