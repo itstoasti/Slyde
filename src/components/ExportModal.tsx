@@ -38,7 +38,7 @@ interface ExportModalProps {
   slide3Ref: React.RefObject<HTMLDivElement>;
   currentSlide: number;
   telegramConfig: TelegramConfig;
-  onOpenSettings: () => void;
+  onOpenSettings: (tab?: 'buffer' | 'ai' | 'telegram' | 'autopilot') => void;
 }
 
 export const ExportModal: React.FC<ExportModalProps> = ({
@@ -200,7 +200,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   // Send to Telegram
   const handleSendTelegram = async () => {
     if (!telegramConfig.botToken || !telegramConfig.chatId) {
-      onOpenSettings();
+      onOpenSettings('telegram');
       return;
     }
 
@@ -228,7 +228,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
   const handleRefreshBufferChannels = async () => {
     if (!bufferConfig.accessToken) {
-      onOpenSettings();
+      onOpenSettings('buffer');
       return;
     }
     setIsRefreshingBuffer(true);
@@ -283,7 +283,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   // Schedule to Buffer (supports instant shareNow or scheduled queue)
   const handleScheduleBuffer = async (overrideMode?: 'now' | 'queue') => {
     if (!bufferConfig.accessToken) {
-      onOpenSettings();
+      onOpenSettings('buffer');
       return;
     }
 
@@ -868,7 +868,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                     type="button"
                     className="btn-secondary"
                     style={{ width: '100%', padding: '6px 12px', fontSize: '0.78rem', justifyContent: 'center' }}
-                    onClick={onOpenSettings}
+                    onClick={() => onOpenSettings('buffer')}
                   >
                     <span>Connect Buffer Account</span>
                   </button>

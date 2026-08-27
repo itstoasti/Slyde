@@ -105,21 +105,35 @@ export const App: React.FC = () => {
   const slide2Ref = useRef<HTMLDivElement>(null);
   const slide3Ref = useRef<HTMLDivElement>(null);
 
-  // Telegram Config from localStorage
+const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
+  botToken: '8436957773:AAHIDTS-uDg6Kv8brHhMK5UYBxkHy3dewzk',
+  chatId: '@Claaaaaarkbot',
+  includeCaption: true,
+  sendAsAlbum: true,
+  inboundListenerEnabled: true
+};
+
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'buffer' | 'ai' | 'telegram' | 'autopilot'>('ai');
+
+  // Telegram Config from localStorage or default pre-loaded
   const [telegramConfig, setTelegramConfig] = useState<TelegramConfig>(() => {
     const saved = localStorage.getItem(STORAGE_KEY_TELEGRAM);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          return {
+            botToken: parsed.botToken || DEFAULT_TELEGRAM_CONFIG.botToken,
+            chatId: parsed.chatId || DEFAULT_TELEGRAM_CONFIG.chatId,
+            includeCaption: parsed.includeCaption ?? true,
+            sendAsAlbum: parsed.sendAsAlbum ?? true,
+            inboundListenerEnabled: parsed.inboundListenerEnabled ?? true,
+            messageThreadId: parsed.messageThreadId
+          };
+        }
       } catch (e) {}
     }
-    return {
-      botToken: '',
-      chatId: '',
-      includeCaption: true,
-      sendAsAlbum: true,
-      inboundListenerEnabled: true
-    };
+    return DEFAULT_TELEGRAM_CONFIG;
   });
 
   // Branding Defaults from localStorage
@@ -176,15 +190,19 @@ export const App: React.FC = () => {
     fetch('/api/get-telegram-config')
       .then(res => res.json())
       .then(data => {
-        if (data.botToken && !telegramConfig.botToken) {
-          setTelegramConfig(prev => ({ ...prev, ...data }));
-          localStorage.setItem(STORAGE_KEY_TELEGRAM, JSON.stringify(data));
-        } else if (telegramConfig.botToken) {
-          fetch('/api/save-telegram-config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(telegramConfig)
-          }).catch(() => {});
+        if (data && (data.botToken || data.chatId)) {
+          setTelegramConfig(prev => {
+            const merged = {
+              ...prev,
+              ...data,
+              botToken: prev.botToken || data.botToken || DEFAULT_TELEGRAM_CONFIG.botToken,
+              chatId: prev.chatId || data.chatId || DEFAULT_TELEGRAM_CONFIG.chatId
+            };
+            try {
+              localStorage.setItem(STORAGE_KEY_TELEGRAM, JSON.stringify(merged));
+            } catch (e) {}
+            return merged;
+          });
         }
       })
       .catch(() => {});
@@ -450,6 +468,7 @@ export const App: React.FC = () => {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+        initialTab={settingsInitialTab}
         config={telegramConfig}
         onSaveConfig={handleSaveTelegramConfig}
         autoPilotConfig={autoPilotConfig}
@@ -475,8 +494,9 @@ export const App: React.FC = () => {
         slide3Ref={slide3Ref}
         currentSlide={currentSlide}
         telegramConfig={telegramConfig}
-        onOpenSettings={() => {
+        onOpenSettings={(tab) => {
           setIsExportOpen(false);
+          setSettingsInitialTab(tab || 'telegram');
           setIsSettingsOpen(true);
         }}
       />

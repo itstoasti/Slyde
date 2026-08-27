@@ -37,6 +37,7 @@ import confetti from 'canvas-confetti';
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTab?: 'buffer' | 'ai' | 'telegram' | 'autopilot';
   config: TelegramConfig;
   onSaveConfig: (updated: TelegramConfig) => void;
   autoPilotConfig: AutoPilotConfig;
@@ -50,6 +51,7 @@ interface SettingsModalProps {
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
+  initialTab = 'ai',
   config,
   onSaveConfig,
   autoPilotConfig,
@@ -59,7 +61,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   slide2Ref,
   slide3Ref
 }) => {
-  const [activeTab, setActiveTab] = useState<'buffer' | 'ai' | 'telegram' | 'autopilot'>('ai');
+  const [activeTab, setActiveTab] = useState<'buffer' | 'ai' | 'telegram' | 'autopilot'>(initialTab);
   const [formData, setFormData] = useState<TelegramConfig>(config);
   const [autoPilotForm, setAutoPilotForm] = useState<AutoPilotConfig>(autoPilotConfig);
 
@@ -96,6 +98,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Sync state whenever modal opens or props change
   useEffect(() => {
     if (isOpen) {
+      if (initialTab) {
+        setActiveTab(initialTab);
+      }
       setFormData(config);
       setAutoPilotForm(autoPilotConfig);
       setTestResult(null);
