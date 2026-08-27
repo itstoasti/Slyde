@@ -108,7 +108,7 @@ export const App: React.FC = () => {
   const slide3Ref = useRef<HTMLDivElement>(null);
 
 const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
-  botToken: '8436957773:AAHIDTS-uDg6Kv8brHhMK5UYBxkHy3dewzk',
+  botToken: '',
   chatId: '@Claaaaaarkbot',
   includeCaption: true,
   sendAsAlbum: true,

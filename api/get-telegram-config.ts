@@ -3,8 +3,8 @@ import fs from 'fs';
 import path from 'path';
 
 const DEFAULT_CONFIG = {
-  botToken: '8436957773:AAHIDTS-uDg6Kv8brHhMK5UYBxkHy3dewzk',
-  chatId: '@Claaaaaarkbot',
+  botToken: process.env.TELEGRAM_BOT_TOKEN || '',
+  chatId: process.env.TELEGRAM_CHAT_ID || '@Claaaaaarkbot',
   includeCaption: true,
   sendAsAlbum: true,
   inboundListenerEnabled: true

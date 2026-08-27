@@ -33,8 +33,8 @@ function slydeServerPlugin() {
 
         if (req.url === '/api/get-telegram-config' && req.method === 'GET') {
           const defaultTelegram = {
-            botToken: '8436957773:AAHIDTS-uDg6Kv8brHhMK5UYBxkHy3dewzk',
-            chatId: '@Claaaaaarkbot',
+            botToken: process.env.TELEGRAM_BOT_TOKEN || '',
+            chatId: process.env.TELEGRAM_CHAT_ID || '@Claaaaaarkbot',
             includeCaption: true,
             sendAsAlbum: true,
             inboundListenerEnabled: true
@@ -63,7 +63,7 @@ function slydeServerPlugin() {
           req.on('end', async () => {
             try {
               const { slides = [], title = 'Recipe Carousel', caption, botToken: clientToken, chatId: clientChatId, messageThreadId } = JSON.parse(body);
-              const botToken = (clientToken && clientToken.trim()) || process.env.TELEGRAM_BOT_TOKEN || '8436957773:AAHIDTS-uDg6Kv8brHhMK5UYBxkHy3dewzk';
+              const botToken = (clientToken && clientToken.trim()) || process.env.TELEGRAM_BOT_TOKEN;
               const chatId = (clientChatId && clientChatId.trim()) || process.env.TELEGRAM_CHAT_ID || '@Claaaaaarkbot';
 
               const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);

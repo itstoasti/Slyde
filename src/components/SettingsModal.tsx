@@ -61,13 +61,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   slide2Ref,
   slide3Ref
 }) => {
-  const defaultBotToken = '8436957773:AAHIDTS-uDg6Kv8brHhMK5UYBxkHy3dewzk';
+  const defaultBotToken = '';
   const defaultChatId = '@Claaaaaarkbot';
 
   const [activeTab, setActiveTab] = useState<'buffer' | 'ai' | 'telegram' | 'autopilot'>(initialTab);
   const [formData, setFormData] = useState<TelegramConfig>(() => ({
     ...config,
-    botToken: config?.botToken?.trim() || defaultBotToken,
+    botToken: config?.botToken?.trim() || '',
     chatId: config?.chatId?.trim() || defaultChatId
   }));
   const [autoPilotForm, setAutoPilotForm] = useState<AutoPilotConfig>(autoPilotConfig);
@@ -862,8 +862,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     type={showBotToken ? 'text' : 'password'}
                     className="form-input"
                     style={{ paddingRight: 36 }}
-                    placeholder="8436957773:AAHIDTS..."
-                    value={formData.botToken || defaultBotToken}
+                    placeholder="Enter Bot Token (e.g. 123456:ABC-DEF...)"
+                    value={formData.botToken}
                     onChange={(e) => setFormData({ ...formData, botToken: e.target.value })}
                   />
                   <button

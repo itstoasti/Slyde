@@ -104,7 +104,7 @@ export async function sendSlideshowToTelegram(
   recipe: RecipeData,
   onProgress?: (status: string) => void
 ): Promise<TelegramSendResult> {
-  const token = (config.botToken && config.botToken.trim()) || '8436957773:AAHIDTS-uDg6Kv8brHhMK5UYBxkHy3dewzk';
+  const token = (config.botToken && config.botToken.trim()) || '';
   const chatId = (config.chatId && config.chatId.trim()) || '@Claaaaaarkbot';
 
   if (slideBlobs.length === 0) {

@@ -487,10 +487,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).send('Slyde Telegram Webhook Endpoint');
   }
 
-  const NEW_TOKEN = '8436957773:AAHIDTS-uDg6Kv8brHhMK5UYBxkHy3dewzk';
-  let botToken = process.env.TELEGRAM_BOT_TOKEN || NEW_TOKEN;
-  if (!botToken || botToken.includes('AAGA7rl6VLtUnAEU2vNTFzv_IhZwA-xSWCk')) {
-    botToken = NEW_TOKEN;
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) {
+    return res.status(500).send('TELEGRAM_BOT_TOKEN environment variable not set');
   }
 
   // Allowed chat IDs — only these chats can use the bot (if configured)

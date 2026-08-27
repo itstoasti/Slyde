@@ -1,7 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const DEFAULT_BOT_TOKEN = '8436957773:AAHIDTS-uDg6Kv8brHhMK5UYBxkHy3dewzk';
-const DEFAULT_CHAT_ID = '@Claaaaaarkbot';
+const DEFAULT_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '@Claaaaaarkbot';
 
 function escapeHtml(str: string): string {
   return (str || '')
@@ -34,8 +33,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       messageThreadId 
     } = req.body || {};
 
-    const botToken = (clientToken && clientToken.trim()) || process.env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN;
-    const chatId = (clientChatId && clientChatId.trim()) || process.env.TELEGRAM_CHAT_ID || DEFAULT_CHAT_ID;
+    const botToken = (clientToken && clientToken.trim()) || process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = (clientChatId && clientChatId.trim()) || DEFAULT_CHAT_ID;
+
+    if (!botToken) {
+      return res.status(400).json({ success: false, message: 'TELEGRAM_BOT_TOKEN is not configured on server' });
+    }
 
     if (!slides || slides.length === 0) {
       return res.status(400).json({ success: false, message: 'No slide images provided' });

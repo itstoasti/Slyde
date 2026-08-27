@@ -199,7 +199,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
   // Send to Telegram
   const handleSendTelegram = async () => {
-    const activeBotToken = telegramConfig?.botToken?.trim() || '8436957773:AAHIDTS-uDg6Kv8brHhMK5UYBxkHy3dewzk';
+    const activeBotToken = telegramConfig?.botToken?.trim() || '';
     const activeChatId = telegramConfig?.chatId?.trim() || '@Claaaaaarkbot';
 
     const activeConfig: TelegramConfig = {
