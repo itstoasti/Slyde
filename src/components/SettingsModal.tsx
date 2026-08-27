@@ -76,7 +76,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [aiConfig, setAiConfig] = useState<AIConfig>(() => getStoredAIConfig());
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showOpenRouterKey, setShowOpenRouterKey] = useState(false);
-  const [showBotToken, setShowBotToken] = useState(false);
+  const [showBotToken, setShowBotToken] = useState(true);
   const [customOpenRouterModel, setCustomOpenRouterModel] = useState('');
   const [isTestingAi, setIsTestingAi] = useState(false);
   const [aiTestResult, setAiTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -863,7 +863,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     className="form-input"
                     style={{ paddingRight: 36 }}
                     placeholder="8436957773:AAHIDTS..."
-                    value={formData.botToken}
+                    value={formData.botToken || defaultBotToken}
                     onChange={(e) => setFormData({ ...formData, botToken: e.target.value })}
                   />
                   <button
@@ -894,7 +894,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   type="text"
                   className="form-input"
                   placeholder="@yourchannel or -100123456789"
-                  value={formData.chatId}
+                  value={formData.chatId || defaultChatId}
                   onChange={(e) => setFormData({ ...formData, chatId: e.target.value })}
                 />
               </div>
