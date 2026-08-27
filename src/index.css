@@ -2252,20 +2252,248 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
    ASPECT RATIO 1:1 (Instagram Post Square 1080x1080) ADAPTATIONS
    ========================================================= */
 
-/* Phone / Square Device Container in 1:1 */
-.aspect-1-1-device {
-  width: 380px !important;
-  height: 380px !important;
-  border-radius: 28px !important;
-  padding: 10px !important;
+/* Instagram Feed Post Simulation */
+.instagram-post-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #000000;
+  color: #ffffff;
+  position: relative;
+  overflow: hidden;
+  user-select: none;
 }
 
-.aspect-1-1-device .phone-screen {
-  border-radius: 20px !important;
+/* Instagram Status Row */
+.instagram-status-bar {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 18px 0 18px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #ffffff;
+  z-index: 10;
 }
 
-.aspect-1-1-device .phone-slide-indicators {
-  top: 6px;
+/* Instagram Post Header */
+.instagram-post-header {
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  flex-shrink: 0;
+}
+
+.instagram-user-left {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.instagram-avatar-ring {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  padding: 2px;
+  background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.instagram-avatar-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #18181b;
+  border: 1.5px solid #000000;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.75rem;
+  color: #f59e0b;
+}
+
+.instagram-avatar-inner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.instagram-user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.instagram-username {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.instagram-subtext {
+  font-size: 0.62rem;
+  color: #a1a1aa;
+}
+
+/* Square Media Canvas */
+.instagram-media-canvas {
+  width: 360px;
+  height: 360px;
+  position: relative;
+  background: #121216;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* Carousel Counter Badge (1/3) */
+.instagram-counter-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(18, 18, 22, 0.75);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px;
+  z-index: 20;
+  letter-spacing: 0.05em;
+}
+
+/* Instagram Action Bar */
+.instagram-action-bar {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  flex-shrink: 0;
+}
+
+.instagram-action-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.instagram-action-icon {
+  cursor: pointer;
+  color: #ffffff;
+  transition: transform 0.15s ease;
+}
+
+.instagram-action-icon:hover {
+  transform: scale(1.1);
+}
+
+.instagram-carousel-dots-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.instagram-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.instagram-dot.active {
+  background: #3897f0;
+  width: 7px;
+  height: 7px;
+}
+
+/* Instagram Caption & Meta */
+.instagram-post-details {
+  padding: 0 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.instagram-likes-row {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.instagram-caption-row {
+  font-size: 0.71rem;
+  color: #f4f4f5;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.instagram-caption-user {
+  font-weight: 700;
+  margin-right: 5px;
+  color: #ffffff;
+}
+
+.instagram-comments-link {
+  font-size: 0.68rem;
+  color: #71717a;
+  cursor: pointer;
+}
+
+.instagram-timestamp {
+  font-size: 0.56rem;
+  color: #52525b;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Instagram Bottom Navigation */
+.instagram-bottom-nav {
+  height: 40px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 8px;
+  background: #000000;
+  flex-shrink: 0;
+}
+
+.instagram-home-indicator {
+  width: 120px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 2px;
+  margin: 3px auto 3px auto;
+  flex-shrink: 0;
+}
+
+/* Clean Centered View for 1:1 when overlay is off */
+.instagram-clean-centered-view {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000000;
 }
 
 /* Slide 1 in 1:1 (Square Hero & Hook) */
