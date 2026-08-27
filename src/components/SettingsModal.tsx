@@ -61,8 +61,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   slide2Ref,
   slide3Ref
 }) => {
+  const defaultBotToken = '8436957773:AAHIDTS-uDg6Kv8brHhMK5UYBxkHy3dewzk';
+  const defaultChatId = '@Claaaaaarkbot';
+
   const [activeTab, setActiveTab] = useState<'buffer' | 'ai' | 'telegram' | 'autopilot'>(initialTab);
-  const [formData, setFormData] = useState<TelegramConfig>(config);
+  const [formData, setFormData] = useState<TelegramConfig>(() => ({
+    ...config,
+    botToken: config?.botToken?.trim() || defaultBotToken,
+    chatId: config?.chatId?.trim() || defaultChatId
+  }));
   const [autoPilotForm, setAutoPilotForm] = useState<AutoPilotConfig>(autoPilotConfig);
 
   // Unified AI Config State (Gemini & OpenRouter)
@@ -101,7 +108,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       if (initialTab) {
         setActiveTab(initialTab);
       }
-      setFormData(config);
+      setFormData({
+        ...config,
+        botToken: config?.botToken?.trim() || defaultBotToken,
+        chatId: config?.chatId?.trim() || defaultChatId
+      });
       setAutoPilotForm(autoPilotConfig);
       setTestResult(null);
       setAiTestResult(null);
