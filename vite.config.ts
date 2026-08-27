@@ -110,7 +110,20 @@ function slydeServerPlugin() {
               const telegramData = await telegramRes.json();
               res.setHeader('Content-Type', 'application/json');
               if (telegramData.ok) {
-                res.end(JSON.stringify({ success: true, message: `3-Slide carousel published to ${chatId}! 🚀` }));
+                if (caption && caption.trim()) {
+                  try {
+                    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        chat_id: chatId,
+                        ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
+                        text: caption
+                      })
+                    });
+                  } catch (captionErr) {}
+                }
+                res.end(JSON.stringify({ success: true, message: `3-Slide carousel & AI caption published to ${chatId}! 🚀` }));
               } else {
                 let msg = telegramData.description || 'Telegram API rejected media';
                 if (msg.includes("bot can't send messages to the bot") || msg.includes('chat not found')) {

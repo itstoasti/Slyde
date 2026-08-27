@@ -95,7 +95,8 @@ export async function startTelegramListener(
                   targetChatConfig,
                   blobs,
                   recipe,
-                  (msg) => callbacks.onStatusUpdate(msg)
+                  undefined,
+                  (msg: string) => callbacks.onStatusUpdate(msg)
                 );
 
                 if (!sendResult.success) {

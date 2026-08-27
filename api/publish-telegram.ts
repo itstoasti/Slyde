@@ -103,9 +103,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    // Deliver the full viral AI caption message directly after the media album
+    if (caption && caption.trim()) {
+      try {
+        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
+            text: caption
+          })
+        });
+      } catch (captionErr) {
+        console.warn('Failed to send AI caption message:', captionErr);
+      }
+    }
+
     return res.status(200).json({
       success: true,
-      message: `3-Slide carousel published to ${chatId}! 🚀`
+      message: `3-Slide carousel & AI caption published to ${chatId}! 🚀`
     });
   } catch (error: any) {
     return res.status(500).json({

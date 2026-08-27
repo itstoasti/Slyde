@@ -221,7 +221,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       for (const el of elements) {
         blobs.push(await captureSlideAsBlob(el, 2));
       }
-      const res = await sendSlideshowToTelegram(activeConfig, blobs, recipe, (msg) => {
+      const res = await sendSlideshowToTelegram(activeConfig, blobs, recipe, socialCaption, (msg) => {
         setTelegramStatus({ loading: true, message: msg });
       });
 

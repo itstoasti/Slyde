@@ -102,6 +102,7 @@ export async function sendSlideshowToTelegram(
   config: TelegramConfig,
   slideBlobs: Blob[],
   recipe: RecipeData,
+  customCaption?: string,
   onProgress?: (status: string) => void
 ): Promise<TelegramSendResult> {
   const token = (config.botToken && config.botToken.trim()) || '';
@@ -115,11 +116,13 @@ export async function sendSlideshowToTelegram(
     };
   }
 
+  const activeCaption = customCaption?.trim() || (config.includeCaption ? createTelegramCaption(recipe) : '');
+
   try {
     onProgress?.('Preparing high-res slides for Telegram...');
     const base64Slides = await Promise.all(slideBlobs.map(blobToBase64));
 
-    onProgress?.('Publishing 3-slide carousel to Telegram...');
+    onProgress?.('Publishing 3-slide carousel & AI caption to Telegram...');
 
     // 1. Try server-side publisher endpoint first (avoids browser ad blockers & CORS)
     try {
@@ -129,7 +132,7 @@ export async function sendSlideshowToTelegram(
         body: JSON.stringify({
           slides: base64Slides,
           title: recipe.title,
-          caption: config.includeCaption ? createTelegramCaption(recipe) : '',
+          caption: activeCaption,
           botToken: token,
           chatId: chatId,
           messageThreadId: config.messageThreadId
@@ -141,7 +144,7 @@ export async function sendSlideshowToTelegram(
         if (serverData.success) {
           return {
             success: true,
-            message: serverData.message || `3-Slide carousel published to ${chatId}! 🚀`
+            message: serverData.message || `3-Slide carousel & caption published to ${chatId}! 🚀`
           };
         } else if (serverData.message) {
           return {
@@ -161,7 +164,7 @@ export async function sendSlideshowToTelegram(
       formData.append('message_thread_id', String(config.messageThreadId));
     }
 
-    const caption = config.includeCaption ? createTelegramCaption(recipe) : '';
+    const shortHook = `🍳 <b>${escapeHtml(recipe.title)}</b>`;
 
     const media = slideBlobs.map((blob, index) => {
       const attachName = `slide_${index + 1}`;
@@ -169,7 +172,7 @@ export async function sendSlideshowToTelegram(
       return {
         type: 'photo',
         media: `attach://${attachName}`,
-        caption: index === 0 && caption ? caption : undefined,
+        caption: index === 0 ? shortHook : undefined,
         parse_mode: 'HTML'
       };
     });
@@ -190,14 +193,30 @@ export async function sendSlideshowToTelegram(
       };
     }
 
+    // Send AI caption message
+    if (activeCaption) {
+      try {
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            ...(config.messageThreadId ? { message_thread_id: config.messageThreadId } : {}),
+            text: activeCaption,
+            parse_mode: 'HTML'
+          })
+        });
+      } catch (captionErr) {}
+    }
+
     return {
       success: true,
-      message: `3-Slide carousel published to ${chatId}! 🚀`
+      message: `3-Slide carousel & AI caption published to ${chatId}! 🚀`
     };
   } catch (error: any) {
     return {
       success: false,
-      message: `Telegram upload failed: ${error.message || 'Network error'}`
+      message: error.message || 'Error uploading slides to Telegram.'
     };
   }
 }
