@@ -23,13 +23,16 @@ import {
   Repeat2,
   Image as ImageIcon,
   Smile,
-  AtSign
+  AtSign,
+  Square,
+  Smartphone
 } from 'lucide-react';
 
 interface PhoneSimulatorProps {
   recipe: RecipeData;
   theme: ThemeConfig;
   aspectRatio: AspectRatio;
+  onChangeAspectRatio?: (ratio: AspectRatio) => void;
   currentSlide: number;
   onSlideChange: (slideIdx: number) => void;
   // Ref handles for export capturing
@@ -42,6 +45,7 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
   recipe,
   theme,
   aspectRatio,
+  onChangeAspectRatio,
   currentSlide,
   onSlideChange,
   slide1Ref,
@@ -111,25 +115,52 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
     setTouchStart(null);
   };
 
-  const phoneHeight = aspectRatio === '4:5' ? 475 : 675;
+  const phoneHeight = aspectRatio === '1:1' ? 380 : aspectRatio === '4:5' ? 475 : 675;
+  const exportSlideHeight = aspectRatio === '1:1' ? 360 : aspectRatio === '4:5' ? 450 : 640;
   const logoUrl = recipe.brandLogo ? getProxiedImageUrl(recipe.brandLogo) : null;
 
   return (
     <div className="phone-simulator-wrapper" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       {/* Top Simulator Controls Toolbar */}
       <div className="simulator-top-toolbar">
+        {/* Aspect Ratio Format Switcher (9:16 TikTok vs 1:1 Instagram Square) */}
+        {onChangeAspectRatio && (
+          <div className="toolbar-group">
+            <button
+              type="button"
+              className={`toolbar-toggle-btn ${aspectRatio === '9:16' ? 'active' : ''}`}
+              onClick={() => onChangeAspectRatio('9:16')}
+              title="TikTok Vertical (9:16)"
+            >
+              <Smartphone size={13} />
+              <span>9:16 TikTok</span>
+            </button>
+            <button
+              type="button"
+              className={`toolbar-toggle-btn ${aspectRatio === '1:1' ? 'active' : ''}`}
+              onClick={() => onChangeAspectRatio('1:1')}
+              title="Instagram Square Post (1:1)"
+            >
+              <Square size={13} />
+              <span>1:1 Square</span>
+            </button>
+          </div>
+        )}
+
         {/* Social Overlay Toggle (On / Off) */}
-        <div className="toolbar-group">
-          <button
-            type="button"
-            className={`toolbar-toggle-btn ${showOverlay ? 'active' : ''}`}
-            onClick={() => setShowOverlay(prev => !prev)}
-            title={showOverlay ? 'Hide TikTok UI Overlay' : 'Show TikTok UI Overlay'}
-          >
-            {showOverlay ? <Eye size={13} /> : <EyeOff size={13} />}
-            <span>{showOverlay ? 'TikTok UI' : 'Clean'}</span>
-          </button>
-        </div>
+        {aspectRatio === '9:16' && (
+          <div className="toolbar-group">
+            <button
+              type="button"
+              className={`toolbar-toggle-btn ${showOverlay ? 'active' : ''}`}
+              onClick={() => setShowOverlay(prev => !prev)}
+              title={showOverlay ? 'Hide TikTok UI Overlay' : 'Show TikTok UI Overlay'}
+            >
+              {showOverlay ? <Eye size={13} /> : <EyeOff size={13} />}
+              <span>{showOverlay ? 'TikTok UI' : 'Clean'}</span>
+            </button>
+          </div>
+        )}
 
         {/* Auto Play Slideshow preview button */}
         <div className="toolbar-group">
@@ -216,16 +247,18 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
       >
         {/* Main Phone Device Mockup Frame */}
         <div 
-          className={`phone-device-container ${aspectRatio === '4:5' ? 'aspect-4-5-device' : ''}`}
+          className={`phone-device-container ${aspectRatio === '1:1' ? 'aspect-1-1-device' : aspectRatio === '4:5' ? 'aspect-4-5-device' : ''}`}
           style={{
             height: `${phoneHeight}px`
           }}
         >
           {/* Dynamic Island / Top Notch */}
-          <div className="phone-island">
-            <div className="island-camera" />
-            <div className="island-sensor" />
-          </div>
+          {aspectRatio !== '1:1' && (
+            <div className="phone-island">
+              <div className="island-camera" />
+              <div className="island-sensor" />
+            </div>
+          )}
 
           {/* Phone Screen Container */}
           <div 
@@ -233,8 +266,8 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
-            {/* Top Slide Indicator Bars (when overlay is off) */}
-            {!showOverlay && (
+            {/* Top Slide Indicator Bars (when overlay is off or non-9:16) */}
+            {(!showOverlay || aspectRatio !== '9:16') && (
               <div className="phone-slide-indicators">
                 {[0, 1, 2].map((idx) => (
                   <div
@@ -279,7 +312,7 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
             </div>
 
             {/* Exact 1:1 Pixel-Accurate TikTok UI Overlay */}
-            {showOverlay && (
+            {showOverlay && aspectRatio === '9:16' && (
               <div className="tiktok-real-overlay">
                 {/* 1. Top Header: Back button & Search pill */}
                 <div className="tiktok-top-bar">
@@ -444,13 +477,13 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
         }}
         aria-hidden="true"
       >
-        <div ref={slide1Ref} style={{ width: 360, height: 640, overflow: 'hidden', position: 'relative' }}>
+        <div ref={slide1Ref} style={{ width: 360, height: exportSlideHeight, overflow: 'hidden', position: 'relative' }}>
           <Slide1Hero recipe={recipe} theme={theme} aspectRatio={aspectRatio} />
         </div>
-        <div ref={slide2Ref} style={{ width: 360, height: 640, overflow: 'hidden', position: 'relative' }}>
+        <div ref={slide2Ref} style={{ width: 360, height: exportSlideHeight, overflow: 'hidden', position: 'relative' }}>
           <Slide2RecipeCard recipe={recipe} theme={theme} aspectRatio={aspectRatio} />
         </div>
-        <div ref={slide3Ref} style={{ width: 360, height: 640, overflow: 'hidden', position: 'relative' }}>
+        <div ref={slide3Ref} style={{ width: 360, height: exportSlideHeight, overflow: 'hidden', position: 'relative' }}>
           <Slide3CTA recipe={recipe} theme={theme} aspectRatio={aspectRatio} />
         </div>
       </div>

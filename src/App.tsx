@@ -77,7 +77,20 @@ export const App: React.FC = () => {
   const activeRecipe = recipesQueue.find((r) => r.id === activeRecipeId) || recipesQueue[0] || RECIPE_PRESETS[0];
 
   const [theme, setTheme] = useState<ThemeConfig>(THEME_PRESETS.caramel);
-  const aspectRatio: AspectRatio = '9:16';
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>(() => {
+    const saved = localStorage.getItem('slyde_aspect_ratio');
+    if (saved === '1:1' || saved === '9:16' || saved === '4:5') return saved;
+    return '9:16';
+  });
+
+  const handleAspectRatioChange = (ratio: AspectRatio) => {
+    setAspectRatio(ratio);
+    try {
+      localStorage.setItem('slyde_aspect_ratio', ratio);
+    } catch (e) {}
+    showToast(ratio === '1:1' ? 'Switched to Instagram Square format (1:1)' : 'Switched to TikTok Vertical format (9:16)', 'info');
+  };
+
   const [currentSlide, setCurrentSlide] = useState<number>(0);
   const [viewMode, setViewMode] = useState<StudioViewMode>('phone');
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState<boolean>(true);
@@ -366,6 +379,8 @@ export const App: React.FC = () => {
         onOpenExport={() => setIsExportOpen(true)}
         viewMode={viewMode}
         onChangeViewMode={setViewMode}
+        aspectRatio={aspectRatio}
+        onChangeAspectRatio={handleAspectRatioChange}
         onRandomizeTheme={handleRandomizeTheme}
         currentTheme={theme}
         isLeftPanelOpen={isLeftPanelOpen}
@@ -395,6 +410,8 @@ export const App: React.FC = () => {
             <EditorPanel
               recipe={activeRecipe}
               theme={theme}
+              aspectRatio={aspectRatio}
+              onChangeAspectRatio={handleAspectRatioChange}
               onUpdateRecipe={handleUpdateActiveRecipe}
               onUpdateTheme={setTheme}
             />
@@ -408,6 +425,7 @@ export const App: React.FC = () => {
               recipe={activeRecipe}
               theme={theme}
               aspectRatio={aspectRatio}
+              onChangeAspectRatio={handleAspectRatioChange}
               currentSlide={currentSlide}
               onSlideChange={setCurrentSlide}
               slide1Ref={slide1Ref}
@@ -419,6 +437,7 @@ export const App: React.FC = () => {
               recipe={activeRecipe}
               theme={theme}
               aspectRatio={aspectRatio}
+              onChangeAspectRatio={handleAspectRatioChange}
               onEditSlide={(idx) => {
                 setCurrentSlide(idx);
                 setViewMode('phone');
@@ -454,6 +473,7 @@ export const App: React.FC = () => {
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
         recipe={activeRecipe}
+        aspectRatio={aspectRatio}
         slide1Ref={slide1Ref}
         slide2Ref={slide2Ref}
         slide3Ref={slide3Ref}

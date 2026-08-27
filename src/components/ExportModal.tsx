@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { RecipeData, TelegramConfig, BufferConfig } from '../types';
+import { RecipeData, TelegramConfig, BufferConfig, AspectRatio } from '../types';
 import { 
   downloadSlideAsPng, 
   downloadAllSlidesZip, 
@@ -32,6 +32,7 @@ interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   recipe: RecipeData;
+  aspectRatio?: AspectRatio;
   slide1Ref: React.RefObject<HTMLDivElement>;
   slide2Ref: React.RefObject<HTMLDivElement>;
   slide3Ref: React.RefObject<HTMLDivElement>;
@@ -44,6 +45,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   isOpen,
   onClose,
   recipe,
+  aspectRatio = '9:16',
   slide1Ref,
   slide2Ref,
   slide3Ref,
@@ -965,7 +967,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               {/* 3. Individual Slide PNG Downloads & Copy */}
               <div>
                 <div style={{ fontWeight: 800, fontSize: '0.78rem', color: 'var(--app-text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Individual Slide Downloads (1080x1920)
+                  Individual Slide Downloads ({aspectRatio === '1:1' ? '1080x1080 Square' : aspectRatio === '4:5' ? '1080x1350' : '1080x1920'})
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>

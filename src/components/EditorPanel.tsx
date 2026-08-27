@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { RecipeData, ThemeConfig } from '../types';
+import { RecipeData, ThemeConfig, AspectRatio } from '../types';
 import { THEME_PRESETS } from '../data/presets';
 import { 
   Sparkles, 
@@ -8,12 +8,16 @@ import {
   Palette, 
   Plus, 
   Trash2,
-  Upload
+  Upload,
+  Smartphone,
+  Square
 } from 'lucide-react';
 
 interface EditorPanelProps {
   recipe: RecipeData;
   theme: ThemeConfig;
+  aspectRatio?: AspectRatio;
+  onChangeAspectRatio?: (ratio: AspectRatio) => void;
   onUpdateRecipe: (updated: RecipeData) => void;
   onUpdateTheme: (theme: ThemeConfig) => void;
 }
@@ -21,6 +25,8 @@ interface EditorPanelProps {
 export const EditorPanel: React.FC<EditorPanelProps> = ({
   recipe,
   theme,
+  aspectRatio = '9:16',
+  onChangeAspectRatio,
   onUpdateRecipe,
   onUpdateTheme
 }) => {
@@ -145,6 +151,39 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
           <span>Style & Theme</span>
         </button>
       </div>
+
+      {/* Quick Format Switcher Banner */}
+      {onChangeAspectRatio && (
+        <div style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--app-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--app-text-muted)' }}>Image Format:</span>
+            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--app-primary)' }}>
+              {aspectRatio === '1:1' ? '1:1 Instagram Square' : '9:16 TikTok Vertical'}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button
+              type="button"
+              className={`toolbar-toggle-btn ${aspectRatio === '9:16' ? 'active' : ''}`}
+              style={{ padding: '4px 10px', fontSize: '0.72rem' }}
+              onClick={() => onChangeAspectRatio('9:16')}
+            >
+              <Smartphone size={12} />
+              <span>9:16</span>
+            </button>
+            <button
+              type="button"
+              className={`toolbar-toggle-btn ${aspectRatio === '1:1' ? 'active' : ''}`}
+              style={{ padding: '4px 10px', fontSize: '0.72rem' }}
+              onClick={() => onChangeAspectRatio('1:1')}
+            >
+              <Square size={12} />
+              <span>1:1</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Editor Content Area */}
       <div className="editor-form-scroll">
@@ -558,6 +597,43 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
         {/* ================= Theme & Style Controls ================= */}
         {activeTab === 'style' && (
           <>
+            {/* Image Size & Aspect Ratio Format Selector */}
+            {onChangeAspectRatio && (
+              <div className="form-group" style={{ marginBottom: 18 }}>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Image Size & Format</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--app-primary)', fontWeight: 800 }}>
+                    {aspectRatio === '1:1' ? '1:1 Square (1080x1080)' : '9:16 Vertical (1080x1920)'}
+                  </span>
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div
+                    className={`theme-card-option ${aspectRatio === '9:16' ? 'active' : ''}`}
+                    onClick={() => onChangeAspectRatio('9:16')}
+                    style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6, cursor: 'pointer' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Smartphone size={16} color={aspectRatio === '9:16' ? 'var(--app-primary)' : 'var(--app-text-muted)'} />
+                      <span style={{ fontWeight: 800, fontSize: '0.82rem', color: '#ffffff' }}>9:16 Vertical</span>
+                    </div>
+                    <span style={{ fontSize: '0.70rem', color: 'var(--app-text-dim)' }}>TikTok · Reels · Stories (1080x1920)</span>
+                  </div>
+
+                  <div
+                    className={`theme-card-option ${aspectRatio === '1:1' ? 'active' : ''}`}
+                    onClick={() => onChangeAspectRatio('1:1')}
+                    style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6, cursor: 'pointer' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Square size={16} color={aspectRatio === '1:1' ? 'var(--app-primary)' : 'var(--app-text-muted)'} />
+                      <span style={{ fontWeight: 800, fontSize: '0.82rem', color: '#ffffff' }}>1:1 Square</span>
+                    </div>
+                    <span style={{ fontSize: '0.70rem', color: 'var(--app-text-dim)' }}>Instagram Feed Post (1080x1080)</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="form-group">
               <label className="form-label">Color Themes & Visual Palettes</label>
               <div className="theme-selector-grid">

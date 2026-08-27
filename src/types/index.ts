@@ -81,7 +81,7 @@ export interface ThemeConfig {
   pillNumberText: string;
 }
 
-export type AspectRatio = '9:16' | '4:5';
+export type AspectRatio = '9:16' | '1:1' | '4:5';
 
 export interface TelegramConfig {
   botToken: string;

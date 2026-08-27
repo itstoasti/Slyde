@@ -720,9 +720,16 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   transition: all 0.2s ease;
 }
 
-.toolbar-toggle-btn.active {
-  background: rgba(255, 255, 255, 0.1);
+.toolbar-toggle-btn:hover:not(.active) {
   color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.toolbar-toggle-btn.active {
+  background: var(--app-primary, #f59e0b);
+  color: #121216 !important;
+  font-weight: 800;
+  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.35);
 }
 
 /* Phone Frame */
@@ -2239,4 +2246,271 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 
 .slide-3.aspect-4-5 .cta-footer-links {
   font-size: 0.58rem;
+}
+
+/* =========================================================
+   ASPECT RATIO 1:1 (Instagram Post Square 1080x1080) ADAPTATIONS
+   ========================================================= */
+
+/* Phone / Square Device Container in 1:1 */
+.aspect-1-1-device {
+  width: 380px !important;
+  height: 380px !important;
+  border-radius: 28px !important;
+  padding: 10px !important;
+}
+
+.aspect-1-1-device .phone-screen {
+  border-radius: 20px !important;
+}
+
+.aspect-1-1-device .phone-slide-indicators {
+  top: 6px;
+}
+
+/* Slide 1 in 1:1 (Square Hero & Hook) */
+.slide-1.aspect-1-1 .slide-top-bar {
+  padding: 14px 12px 0 12px;
+}
+
+.slide-1.aspect-1-1 .brand-pill-badge,
+.slide-1.aspect-1-1 .hero-simple-badge {
+  font-size: 0.56rem;
+  padding: 3px 8px;
+}
+
+.slide-1.aspect-1-1 .slide-hero-safe-content {
+  padding: 0 12px 10px 12px;
+  max-width: 100%;
+  gap: 4px;
+}
+
+.slide-1.aspect-1-1 .hero-recipe-title {
+  font-size: 1.25rem;
+  line-height: 1.10;
+  letter-spacing: -0.02em;
+  max-width: 100%;
+}
+
+.slide-1.aspect-1-1 .hero-hook-text {
+  font-size: 0.68rem;
+  line-height: 1.22;
+  max-width: 100%;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.slide-1.aspect-1-1 .hero-stats-grid {
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.slide-1.aspect-1-1 .stat-box {
+  padding: 3px 1px;
+  border-radius: 5px;
+}
+
+.slide-1.aspect-1-1 .stat-label {
+  font-size: 0.48rem;
+  letter-spacing: 0.02em;
+}
+
+.slide-1.aspect-1-1 .stat-value {
+  font-size: 0.76rem;
+  margin-top: 1px;
+}
+
+/* Slide 2 in 1:1 (Square Recipe Card) */
+.slide-2.aspect-1-1 {
+  padding: 12px 8px 4px 8px;
+  gap: 3px;
+  justify-content: space-between;
+}
+
+.slide-2.aspect-1-1 .card-top-header {
+  margin-bottom: 2px;
+  padding: 0 2px;
+}
+
+.slide-2.aspect-1-1 .card-eyebrow {
+  font-size: 0.50rem;
+}
+
+.slide-2.aspect-1-1 .card-title {
+  font-size: 0.84rem;
+  line-height: 1.08;
+  max-width: 82%;
+}
+
+.slide-2.aspect-1-1 .card-header-thumbnail {
+  width: 26px;
+  height: 26px;
+  border-width: 1.5px;
+}
+
+.slide-2.aspect-1-1 .recipe-main-card {
+  padding: 5px 7px 4px 7px;
+  border-radius: 9px;
+  gap: 2.5px;
+  flex: 1;
+  min-height: 0;
+}
+
+.slide-2.aspect-1-1 .section-title {
+  font-size: 0.60rem;
+  gap: 3px;
+}
+
+.slide-2.aspect-1-1 .ingredients-grid {
+  gap: 2px;
+  margin-bottom: 2px;
+}
+
+.slide-2.aspect-1-1 .ingredient-pill {
+  padding: 1.5px 3.5px;
+  min-height: 13px;
+  border-radius: 3px;
+  gap: 2.5px;
+}
+
+.slide-2.aspect-1-1 .ing-dot {
+  width: 2.5px;
+  height: 2.5px;
+}
+
+.slide-2.aspect-1-1 .ing-text {
+  font-size: calc(0.56rem * var(--font-scale, 1));
+  line-height: 1.05;
+}
+
+.slide-2.aspect-1-1 .method-list {
+  gap: 1.5px;
+}
+
+.slide-2.aspect-1-1 .method-step-item {
+  padding: 1.5px 4px;
+  gap: 3.5px;
+  border-radius: 3.5px;
+}
+
+.slide-2.aspect-1-1 .step-number-badge {
+  width: 12px;
+  height: 12px;
+  font-size: 0.48rem;
+  border-radius: 2px;
+  margin-top: 0.5px;
+}
+
+.slide-2.aspect-1-1 .step-text,
+.slide-2.aspect-1-1 .step-instruction-text {
+  font-size: calc(0.56rem * var(--font-scale, 1));
+  line-height: 1.08;
+}
+
+.slide-2.aspect-1-1 .card-safe-stat-bar {
+  padding: 1px 2px 2px 2px;
+  margin-top: 1px;
+  gap: 4px;
+}
+
+.slide-2.aspect-1-1 .safe-stat-item {
+  font-size: 0.50rem;
+}
+
+.slide-2.aspect-1-1 .safe-stat-divider {
+  font-size: 0.50rem;
+}
+
+/* Slide 3 in 1:1 (Square Brand CTA) */
+.slide-3.aspect-1-1 {
+  padding: 12px 10px 6px 10px;
+  justify-content: space-between;
+}
+
+.slide-3.aspect-1-1 .cta-ambient-orb {
+  width: 120px;
+  height: 120px;
+}
+
+.slide-3.aspect-1-1 .cta-content-wrapper {
+  gap: 3.5px;
+  height: 100%;
+  justify-content: space-between;
+}
+
+.slide-3.aspect-1-1 .cta-top-badge {
+  padding: 2px 7px;
+  font-size: 0.48rem;
+  letter-spacing: 0.03em;
+  margin-top: 0;
+}
+
+.slide-3.aspect-1-1 .cta-brand-header {
+  gap: 1px;
+}
+
+.slide-3.aspect-1-1 .cta-app-logo-box {
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 6px !important;
+  margin-bottom: 0px;
+}
+
+.slide-3.aspect-1-1 .cta-brand-title {
+  font-size: 1.10rem;
+  line-height: 1.0;
+  text-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.slide-3.aspect-1-1 .cta-brand-subtitle {
+  font-size: 0.55rem;
+}
+
+.slide-3.aspect-1-1 .cta-perks-grid {
+  gap: 2.5px;
+  margin-top: 0px;
+}
+
+.slide-3.aspect-1-1 .cta-perk-card {
+  padding: 2.5px 4.5px;
+  gap: 3.5px;
+  border-radius: 5px;
+}
+
+.slide-3.aspect-1-1 .perk-number {
+  width: 13px;
+  height: 13px;
+  font-size: 0.48rem;
+  border-radius: 2.5px;
+}
+
+.slide-3.aspect-1-1 .perk-title {
+  font-size: 0.54rem;
+  line-height: 1.05;
+}
+
+.slide-3.aspect-1-1 .perk-desc {
+  font-size: 0.46rem;
+  line-height: 1.08;
+}
+
+.slide-3.aspect-1-1 .brand-mini-pill {
+  display: none;
+}
+
+.slide-3.aspect-1-1 .cta-button-container {
+  margin-top: 0;
+}
+
+.slide-3.aspect-1-1 .cta-glow-button {
+  padding: 4.5px 14px;
+  font-size: 0.68rem;
+  width: 78%;
+}
+
+.slide-3.aspect-1-1 .cta-footer-links {
+  font-size: 0.48rem;
+  margin-top: -1px;
 }

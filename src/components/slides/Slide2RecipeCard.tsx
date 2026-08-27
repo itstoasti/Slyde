@@ -28,27 +28,51 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
   // Density class
   let computedDensity = config.density;
   if (computedDensity === 'auto') {
-    if (numSteps >= 6 || (numSteps >= 5 && totalChars > 500)) {
-      computedDensity = 'micro';
-    } else if (numSteps >= 5 || numIngs > 6 || totalChars > 380) {
-      computedDensity = 'compact';
-    } else if (numIngs <= 4 && numSteps <= 3 && totalChars < 200) {
-      computedDensity = 'spacious';
+    if (aspectRatio === '1:1') {
+      if (numSteps >= 5 || totalChars > 400 || numIngs >= 7) {
+        computedDensity = 'micro';
+      } else if (numSteps >= 4 || numIngs >= 5 || totalChars > 260) {
+        computedDensity = 'compact';
+      } else {
+        computedDensity = 'standard';
+      }
     } else {
-      computedDensity = 'standard';
+      if (numSteps >= 6 || (numSteps >= 5 && totalChars > 500)) {
+        computedDensity = 'micro';
+      } else if (numSteps >= 5 || numIngs > 6 || totalChars > 380) {
+        computedDensity = 'compact';
+      } else if (numIngs <= 4 && numSteps <= 3 && totalChars < 200) {
+        computedDensity = 'spacious';
+      } else {
+        computedDensity = 'standard';
+      }
     }
   }
 
-  // 2 columns for 5+ ingredients
+  // 2 or 3 columns for ingredients in square mode to minimize vertical space
   let computedColumns = config.ingredientColumns;
   if (computedColumns === 'auto') {
-    computedColumns = numIngs >= 5 ? '2' : '1';
+    if (aspectRatio === '1:1') {
+      computedColumns = numIngs >= 6 ? '3' : numIngs >= 3 ? '2' : '1';
+    } else {
+      computedColumns = numIngs >= 5 ? '2' : '1';
+    }
   }
 
   // Proportional Auto-Fit Font Scaling
   let autoFontScale = 1.0;
   if (recipe.slide2Config?.fontScale && recipe.slide2Config.fontScale !== 1.0) {
     autoFontScale = recipe.slide2Config.fontScale;
+  } else if (aspectRatio === '1:1') {
+    if (numSteps >= 6 || totalChars > 500) {
+      autoFontScale = 0.78;
+    } else if (numSteps >= 5 || totalChars > 380) {
+      autoFontScale = 0.84;
+    } else if (numSteps >= 4 || totalChars > 260) {
+      autoFontScale = 0.90;
+    } else {
+      autoFontScale = 0.96;
+    }
   } else if (numSteps >= 6 || totalChars > 600) {
     autoFontScale = 0.80;
   } else if (numSteps >= 5 || totalChars > 450) {
