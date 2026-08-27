@@ -5,9 +5,53 @@
     "api/telegram-webhook.ts": {
       "memory": 2048,
       "maxDuration": 60
+    },
+    "api/publish-telegram.ts": {
+      "memory": 1024,
+      "maxDuration": 30
     }
   },
   "rewrites": [
+    {
+      "source": "/api/get-telegram-config",
+      "destination": "/api/config?type=telegram"
+    },
+    {
+      "source": "/api/save-telegram-config",
+      "destination": "/api/config?type=telegram"
+    },
+    {
+      "source": "/api/get-ai-config",
+      "destination": "/api/config?type=ai"
+    },
+    {
+      "source": "/api/save-ai-config",
+      "destination": "/api/config?type=ai"
+    },
+    {
+      "source": "/api/get-branding-defaults",
+      "destination": "/api/config?type=branding"
+    },
+    {
+      "source": "/api/save-branding-defaults",
+      "destination": "/api/config?type=branding"
+    },
+    {
+      "source": "/api/get-recipes-queue",
+      "destination": "/api/config?type=recipes"
+    },
+    {
+      "source": "/api/save-recipes-queue",
+      "destination": "/api/config?type=recipes"
+    },
+    {
+      "source": "/api/get-buffer-config",
+      "destination": "/api/config?type=buffer"
+    },
+    {
+      "source": "/api/save-buffer-config",
+      "destination": "/api/config?type=buffer"
+    },
     {
       "source": "/api/(.*)",
       "destination": "/api/$1"
