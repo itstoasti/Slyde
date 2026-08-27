@@ -10,8 +10,6 @@ import { StoryboardView } from './components/StoryboardView';
 import { SettingsModal } from './components/SettingsModal';
 import { ExportModal } from './components/ExportModal';
 import { startTelegramListener, stopTelegramListener } from './utils/telegramListener';
-import { captureSlideAsBlob } from './utils/exporter';
-import { sendSlideshowToTelegram } from './utils/telegram';
 import confetti from 'canvas-confetti';
 
 const STORAGE_KEY_TELEGRAM = 'slyde_telegram_config';
@@ -385,51 +383,6 @@ const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
     showToast('Telegram configuration saved and synced to 24/7 bot!', 'success');
   };
 
-  const [isSendingTelegramQuick, setIsSendingTelegramQuick] = useState(false);
-
-  const handleQuickSendTelegram = async () => {
-    const activeBotToken = telegramConfig?.botToken?.trim() || DEFAULT_TELEGRAM_CONFIG.botToken;
-    const activeChatId = telegramConfig?.chatId?.trim() || DEFAULT_TELEGRAM_CONFIG.chatId;
-
-    const activeConfig: TelegramConfig = {
-      botToken: activeBotToken,
-      chatId: activeChatId,
-      includeCaption: telegramConfig?.includeCaption ?? true,
-      sendAsAlbum: telegramConfig?.sendAsAlbum ?? true,
-      inboundListenerEnabled: telegramConfig?.inboundListenerEnabled ?? true,
-      messageThreadId: telegramConfig?.messageThreadId
-    };
-
-    const elements = [slide1Ref.current, slide2Ref.current, slide3Ref.current].filter(Boolean) as HTMLElement[];
-    if (elements.length < 3) {
-      showToast('Rendering slide previews for Telegram...', 'info');
-      return;
-    }
-
-    setIsSendingTelegramQuick(true);
-    showToast(`🚀 Publishing 3-slide photo album to ${activeChatId}...`, 'info');
-    try {
-      const blobs: Blob[] = [];
-      for (const el of elements) {
-        blobs.push(await captureSlideAsBlob(el, 2));
-      }
-      const res = await sendSlideshowToTelegram(activeConfig, blobs, activeRecipe, (msg) => {
-        showToast(msg, 'info');
-      });
-
-      if (res.success) {
-        showToast(res.message || `✓ 3-Slide carousel published to ${activeChatId}! 🚀`, 'success');
-        confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
-      } else {
-        showToast(res.message || 'Telegram upload failed', 'error');
-      }
-    } catch (err: any) {
-      showToast(`Telegram upload error: ${err.message}`, 'error');
-    } finally {
-      setIsSendingTelegramQuick(false);
-    }
-  };
-
   const handleSaveAutoPilotConfig = (config: AutoPilotConfig) => {
     setAutoPilotConfig(config);
     localStorage.setItem(STORAGE_KEY_AUTOPILOT, JSON.stringify(config));
@@ -442,8 +395,6 @@ const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
       <Header
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenExport={() => setIsExportOpen(true)}
-        onSendTelegram={handleQuickSendTelegram}
-        isSendingTelegram={isSendingTelegramQuick}
         viewMode={viewMode}
         onChangeViewMode={setViewMode}
         onRandomizeTheme={handleRandomizeTheme}

@@ -8,16 +8,12 @@ import {
   LayoutGrid, 
   Shuffle,
   PanelLeftClose,
-  PanelLeft,
-  Send,
-  Loader2
+  PanelLeft
 } from 'lucide-react';
 
 interface HeaderProps {
   onOpenSettings: () => void;
   onOpenExport: () => void;
-  onSendTelegram?: () => void;
-  isSendingTelegram?: boolean;
   viewMode: StudioViewMode;
   onChangeViewMode: (mode: StudioViewMode) => void;
   onRandomizeTheme: () => void;
@@ -29,8 +25,6 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onOpenExport,
-  onSendTelegram,
-  isSendingTelegram = false,
   viewMode,
   onChangeViewMode,
   onRandomizeTheme,
@@ -104,32 +98,6 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right: Export & Settings */}
       <div className="header-actions">
-        {onSendTelegram && (
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={onSendTelegram}
-            title="Instant 1-Click Publish: Send 3-slide photo album to Telegram (@Claaaaaarkbot)"
-            style={{
-              background: 'rgba(56, 189, 248, 0.12)',
-              borderColor: 'rgba(56, 189, 248, 0.4)',
-              color: '#38bdf8',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6
-            }}
-            disabled={isSendingTelegram}
-          >
-            {isSendingTelegram ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Send size={14} />
-            )}
-            <span>{isSendingTelegram ? 'Sending...' : 'Send to Telegram'}</span>
-          </button>
-        )}
-
         <button
           type="button"
           className="btn-primary"

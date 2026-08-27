@@ -138,7 +138,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  const { jsonrpc = '2.0', id, method, params } = req.body || {};
+  const { id, method, params } = req.body || {};
 
   if (method === 'tools/list') {
     return res.status(200).json({
