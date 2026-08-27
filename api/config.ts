@@ -40,7 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (type === 'telegram') {
     const defaultTelegram = {
       botToken: process.env.TELEGRAM_BOT_TOKEN || '',
-      chatId: process.env.TELEGRAM_CHAT_ID || '@Claaaaaarkbot',
+      chatId: process.env.TELEGRAM_CHAT_ID || '1294588369',
       includeCaption: true,
       sendAsAlbum: true,
       inboundListenerEnabled: true
@@ -66,7 +66,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ...defaultTelegram,
       ...saved,
       botToken: process.env.TELEGRAM_BOT_TOKEN || saved.botToken || '',
-      chatId: process.env.TELEGRAM_CHAT_ID || saved.chatId || '@Claaaaaarkbot'
+      chatId: process.env.TELEGRAM_CHAT_ID || saved.chatId || '1294588369'
     });
   }
 

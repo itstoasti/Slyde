@@ -105,7 +105,8 @@ export async function sendSlideshowToTelegram(
   onProgress?: (status: string) => void
 ): Promise<TelegramSendResult> {
   const token = (config.botToken && config.botToken.trim()) || '';
-  const chatId = (config.chatId && config.chatId.trim()) || '@Claaaaaarkbot';
+  const rawChat = (config.chatId && config.chatId.trim()) || '';
+  const chatId = (rawChat && !rawChat.includes('Claaaaaark')) ? rawChat : '1294588369';
 
   if (slideBlobs.length === 0) {
     return {

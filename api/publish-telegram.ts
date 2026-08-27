@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const DEFAULT_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '@Claaaaaarkbot';
+const DEFAULT_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '1294588369';
 
 function escapeHtml(str: string): string {
   return (str || '')
@@ -34,7 +34,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } = req.body || {};
 
     const botToken = (clientToken && clientToken.trim()) || process.env.TELEGRAM_BOT_TOKEN;
-    const chatId = (clientChatId && clientChatId.trim()) || DEFAULT_CHAT_ID;
+    const rawChat = (clientChatId && clientChatId.trim()) || '';
+    const chatId = (rawChat && !rawChat.toLowerCase().includes('claaaaaark')) ? rawChat : (DEFAULT_CHAT_ID || '1294588369');
 
     if (!botToken) {
       return res.status(400).json({ success: false, message: 'TELEGRAM_BOT_TOKEN is not configured on server' });

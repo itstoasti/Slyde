@@ -107,7 +107,7 @@ export const App: React.FC = () => {
 
 const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
   botToken: '',
-  chatId: '@Claaaaaarkbot',
+  chatId: '1294588369',
   includeCaption: true,
   sendAsAlbum: true,
   inboundListenerEnabled: true
@@ -122,9 +122,11 @@ const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
       try {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
+          const rawChat = parsed.chatId;
+          const cleanChat = (rawChat && !rawChat.includes('Claaaaaark')) ? rawChat : '1294588369';
           return {
             botToken: parsed.botToken || DEFAULT_TELEGRAM_CONFIG.botToken,
-            chatId: parsed.chatId || DEFAULT_TELEGRAM_CONFIG.chatId,
+            chatId: cleanChat,
             includeCaption: parsed.includeCaption ?? true,
             sendAsAlbum: parsed.sendAsAlbum ?? true,
             inboundListenerEnabled: parsed.inboundListenerEnabled ?? true,

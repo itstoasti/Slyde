@@ -62,13 +62,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   slide3Ref
 }) => {
   const defaultBotToken = '';
-  const defaultChatId = '@Claaaaaarkbot';
+  const defaultChatId = '1294588369';
 
   const [activeTab, setActiveTab] = useState<'buffer' | 'ai' | 'telegram' | 'autopilot'>(initialTab);
   const [formData, setFormData] = useState<TelegramConfig>(() => ({
     ...config,
     botToken: config?.botToken?.trim() || '',
-    chatId: config?.chatId?.trim() || defaultChatId
+    chatId: (config?.chatId && !config.chatId.includes('Claaaaaark')) ? config.chatId.trim() : defaultChatId
   }));
   const [autoPilotForm, setAutoPilotForm] = useState<AutoPilotConfig>(autoPilotConfig);
 

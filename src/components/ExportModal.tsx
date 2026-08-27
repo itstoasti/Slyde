@@ -199,8 +199,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
   // Send to Telegram
   const handleSendTelegram = async () => {
+    const rawChat = telegramConfig?.chatId?.trim() || '';
+    const activeChatId = (rawChat && !rawChat.includes('Claaaaaark')) ? rawChat : '1294588369';
     const activeBotToken = telegramConfig?.botToken?.trim() || '';
-    const activeChatId = telegramConfig?.chatId?.trim() || '@Claaaaaarkbot';
 
     const activeConfig: TelegramConfig = {
       botToken: activeBotToken,
@@ -614,7 +615,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                       <span>Direct Telegram Publishing</span>
                     </div>
                     <div style={{ fontSize: '0.72rem', color: 'var(--app-text-muted)', marginTop: 2 }}>
-                      <span>Posts 3-slide high-res carousel directly to <strong>{telegramConfig?.chatId?.trim() || '@Claaaaaarkbot'}</strong></span>
+                      <span>Posts 3-slide high-res carousel directly to <strong>{(telegramConfig?.chatId && !telegramConfig.chatId.includes('Claaaaaark')) ? telegramConfig.chatId : '1294588369'}</strong></span>
                     </div>
                   </div>
 
