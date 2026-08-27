@@ -599,7 +599,62 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             {/* RIGHT COLUMN: Export Downloads, Buffer & Telegram */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               
-              {/* 1. Schedule with Buffer */}
+              {/* 1. Direct Telegram Publishing (Instant 1-Click) */}
+              <div style={{ 
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(0, 0, 0, 0.4))', 
+                border: '1.5px solid rgba(245, 158, 11, 0.45)', 
+                borderRadius: 'var(--radius-md)', 
+                padding: 14,
+                boxShadow: '0 4px 20px rgba(245, 158, 11, 0.08)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '0.90rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Send size={16} color="var(--app-primary)" />
+                      <span>Direct Telegram Publishing</span>
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--app-text-muted)', marginTop: 2 }}>
+                      <span>Posts 3-slide high-res carousel directly to <strong>{telegramConfig?.chatId?.trim() || '@Claaaaaarkbot'}</strong></span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ padding: '8px 18px', fontSize: '0.82rem', fontWeight: 800 }}
+                    onClick={handleSendTelegram}
+                    disabled={telegramStatus?.loading}
+                  >
+                    {telegramStatus?.loading ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Publishing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send size={14} />
+                        <span>Publish to Telegram</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {telegramStatus && (
+                  <div
+                    className={`extraction-status-banner ${telegramStatus.success === undefined ? 'loading' : telegramStatus.success ? 'success' : 'error'}`}
+                    style={{ marginTop: 10, padding: '6px 10px', fontSize: '0.74rem' }}
+                  >
+                    {telegramStatus.success ? (
+                      <CheckCircle2 size={14} color="#10b981" />
+                    ) : (
+                      <Loader2 size={14} className={telegramStatus.loading ? 'animate-spin' : ''} />
+                    )}
+                    <span>{telegramStatus.message}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. Schedule with Buffer */}
               <div style={{ background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: 'var(--radius-md)', padding: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                   <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1038,55 +1093,6 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                     </div>
                   ))}
                 </div>
-              </div>
-
-              {/* 4. Send to Telegram directly */}
-              <div style={{ background: 'rgba(245, 158, 11, 0.04)', border: '1px solid rgba(245, 158, 11, 0.18)', borderRadius: 'var(--radius-md)', padding: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div>
-                    <div style={{ fontWeight: 800, fontSize: '0.80rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <Send size={13} color="var(--app-primary)" />
-                      <span>Direct Telegram Publishing</span>
-                    </div>
-                    <div style={{ fontSize: '0.68rem', color: 'var(--app-text-muted)', marginTop: 1 }}>
-                      <span>Ready to post album to {telegramConfig?.chatId?.trim() || '@Claaaaaarkbot'}</span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    style={{ padding: '5px 12px', fontSize: '0.74rem' }}
-                    onClick={handleSendTelegram}
-                    disabled={telegramStatus?.loading}
-                  >
-                    {telegramStatus?.loading ? (
-                      <>
-                        <Loader2 size={12} className="animate-spin" />
-                        <span>Sending...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Send size={12} />
-                        <span>Publish</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {telegramStatus && (
-                  <div
-                    className={`extraction-status-banner ${telegramStatus.success === undefined ? 'loading' : telegramStatus.success ? 'success' : 'error'}`}
-                    style={{ marginTop: 6, padding: '4px 8px', fontSize: '0.70rem' }}
-                  >
-                    {telegramStatus.success ? (
-                      <CheckCircle2 size={12} color="#10b981" />
-                    ) : (
-                      <Loader2 size={12} className={telegramStatus.loading ? 'animate-spin' : ''} />
-                    )}
-                    <span>{telegramStatus.message}</span>
-                  </div>
-                )}
               </div>
             </div>
           </div>
