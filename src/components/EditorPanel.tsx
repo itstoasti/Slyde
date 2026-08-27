@@ -152,39 +152,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
         </button>
       </div>
 
-      {/* Quick Format Switcher Banner */}
-      {onChangeAspectRatio && (
-        <div style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--app-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--app-text-muted)' }}>Image Format:</span>
-            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--app-primary)' }}>
-              {aspectRatio === '1:1' ? '1:1 Instagram Square' : '9:16 TikTok Vertical'}
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', gap: 4 }}>
-            <button
-              type="button"
-              className={`toolbar-toggle-btn ${aspectRatio === '9:16' ? 'active' : ''}`}
-              style={{ padding: '4px 10px', fontSize: '0.72rem' }}
-              onClick={() => onChangeAspectRatio('9:16')}
-            >
-              <Smartphone size={12} />
-              <span>9:16</span>
-            </button>
-            <button
-              type="button"
-              className={`toolbar-toggle-btn ${aspectRatio === '1:1' ? 'active' : ''}`}
-              style={{ padding: '4px 10px', fontSize: '0.72rem' }}
-              onClick={() => onChangeAspectRatio('1:1')}
-            >
-              <Square size={12} />
-              <span>1:1</span>
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Editor Content Area */}
       <div className="editor-form-scroll">
         {/* ================= Slide 1 Controls ================= */}

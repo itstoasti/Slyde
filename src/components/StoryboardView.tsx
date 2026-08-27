@@ -4,14 +4,13 @@ import { Slide1Hero } from './slides/Slide1Hero';
 import { Slide2RecipeCard } from './slides/Slide2RecipeCard';
 import { Slide3CTA } from './slides/Slide3CTA';
 import { downloadSlideAsPng, copySlideImageToClipboard } from '../utils/exporter';
-import { Download, Copy, CheckCircle2, Edit3, ZoomIn, ZoomOut, Smartphone, Square } from 'lucide-react';
+import { Download, Copy, CheckCircle2, Edit3, ZoomIn, ZoomOut } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface StoryboardViewProps {
   recipe: RecipeData;
   theme: ThemeConfig;
   aspectRatio: AspectRatio;
-  onChangeAspectRatio?: (ratio: AspectRatio) => void;
   onEditSlide: (slideIndex: number) => void;
   slide1Ref: React.RefObject<HTMLDivElement>;
   slide2Ref: React.RefObject<HTMLDivElement>;
@@ -22,7 +21,6 @@ export const StoryboardView: React.FC<StoryboardViewProps> = ({
   recipe,
   theme,
   aspectRatio,
-  onChangeAspectRatio,
   onEditSlide,
   slide1Ref,
   slide2Ref,
@@ -62,51 +60,26 @@ export const StoryboardView: React.FC<StoryboardViewProps> = ({
           <span className="brand-badge-tag">Side-by-Side</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {onChangeAspectRatio && (
-            <div className="toolbar-group">
-              <button
-                type="button"
-                className={`toolbar-toggle-btn ${aspectRatio === '9:16' ? 'active' : ''}`}
-                onClick={() => onChangeAspectRatio('9:16')}
-                title="TikTok Vertical (9:16)"
-              >
-                <Smartphone size={13} />
-                <span>9:16 TikTok</span>
-              </button>
-              <button
-                type="button"
-                className={`toolbar-toggle-btn ${aspectRatio === '1:1' ? 'active' : ''}`}
-                onClick={() => onChangeAspectRatio('1:1')}
-                title="Instagram Square Post (1:1)"
-              >
-                <Square size={13} />
-                <span>1:1 Square</span>
-              </button>
-            </div>
-          )}
-
-          <div className="toolbar-group">
-            <button
-              type="button"
-              className="toolbar-toggle-btn"
-              onClick={() => setZoomScale(prev => Math.max(0.5, prev - 0.1))}
-              title="Zoom Out"
-            >
-              <ZoomOut size={14} />
-            </button>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0 6px', color: 'var(--app-text-muted)' }}>
-              {Math.round(zoomScale * 100)}%
-            </span>
-            <button
-              type="button"
-              className="toolbar-toggle-btn"
-              onClick={() => setZoomScale(prev => Math.min(1.0, prev + 0.1))}
-              title="Zoom In"
-            >
-              <ZoomIn size={14} />
-            </button>
-          </div>
+        <div className="toolbar-group">
+          <button
+            type="button"
+            className="toolbar-toggle-btn"
+            onClick={() => setZoomScale(prev => Math.max(0.5, prev - 0.1))}
+            title="Zoom Out"
+          >
+            <ZoomOut size={14} />
+          </button>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0 6px', color: 'var(--app-text-muted)' }}>
+            {Math.round(zoomScale * 100)}%
+          </span>
+          <button
+            type="button"
+            className="toolbar-toggle-btn"
+            onClick={() => setZoomScale(prev => Math.min(1.0, prev + 0.1))}
+            title="Zoom In"
+          >
+            <ZoomIn size={14} />
+          </button>
         </div>
       </div>
 

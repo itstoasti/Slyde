@@ -379,8 +379,6 @@ export const App: React.FC = () => {
         onOpenExport={() => setIsExportOpen(true)}
         viewMode={viewMode}
         onChangeViewMode={setViewMode}
-        aspectRatio={aspectRatio}
-        onChangeAspectRatio={handleAspectRatioChange}
         onRandomizeTheme={handleRandomizeTheme}
         currentTheme={theme}
         isLeftPanelOpen={isLeftPanelOpen}
@@ -425,7 +423,6 @@ export const App: React.FC = () => {
               recipe={activeRecipe}
               theme={theme}
               aspectRatio={aspectRatio}
-              onChangeAspectRatio={handleAspectRatioChange}
               currentSlide={currentSlide}
               onSlideChange={setCurrentSlide}
               slide1Ref={slide1Ref}
@@ -437,7 +434,6 @@ export const App: React.FC = () => {
               recipe={activeRecipe}
               theme={theme}
               aspectRatio={aspectRatio}
-              onChangeAspectRatio={handleAspectRatioChange}
               onEditSlide={(idx) => {
                 setCurrentSlide(idx);
                 setViewMode('phone');

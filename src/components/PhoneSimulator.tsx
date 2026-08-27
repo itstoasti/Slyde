@@ -23,16 +23,13 @@ import {
   Repeat2,
   Image as ImageIcon,
   Smile,
-  AtSign,
-  Square,
-  Smartphone
+  AtSign
 } from 'lucide-react';
 
 interface PhoneSimulatorProps {
   recipe: RecipeData;
   theme: ThemeConfig;
   aspectRatio: AspectRatio;
-  onChangeAspectRatio?: (ratio: AspectRatio) => void;
   currentSlide: number;
   onSlideChange: (slideIdx: number) => void;
   // Ref handles for export capturing
@@ -45,7 +42,6 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
   recipe,
   theme,
   aspectRatio,
-  onChangeAspectRatio,
   currentSlide,
   onSlideChange,
   slide1Ref,
@@ -123,30 +119,6 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
     <div className="phone-simulator-wrapper" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       {/* Top Simulator Controls Toolbar */}
       <div className="simulator-top-toolbar">
-        {/* Aspect Ratio Format Switcher (9:16 TikTok vs 1:1 Instagram Square) */}
-        {onChangeAspectRatio && (
-          <div className="toolbar-group">
-            <button
-              type="button"
-              className={`toolbar-toggle-btn ${aspectRatio === '9:16' ? 'active' : ''}`}
-              onClick={() => onChangeAspectRatio('9:16')}
-              title="TikTok Vertical (9:16)"
-            >
-              <Smartphone size={13} />
-              <span>9:16 TikTok</span>
-            </button>
-            <button
-              type="button"
-              className={`toolbar-toggle-btn ${aspectRatio === '1:1' ? 'active' : ''}`}
-              onClick={() => onChangeAspectRatio('1:1')}
-              title="Instagram Square Post (1:1)"
-            >
-              <Square size={13} />
-              <span>1:1 Square</span>
-            </button>
-          </div>
-        )}
-
         {/* Social Overlay Toggle (On / Off) */}
         {aspectRatio === '9:16' && (
           <div className="toolbar-group">

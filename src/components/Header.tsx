@@ -1,5 +1,5 @@
 import React from 'react';
-import { StudioViewMode, ThemeConfig, AspectRatio } from '../types';
+import { StudioViewMode, ThemeConfig } from '../types';
 import { 
   Settings, 
   Download, 
@@ -8,8 +8,7 @@ import {
   LayoutGrid, 
   Shuffle,
   PanelLeftClose,
-  PanelLeft,
-  Square
+  PanelLeft
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -17,8 +16,6 @@ interface HeaderProps {
   onOpenExport: () => void;
   viewMode: StudioViewMode;
   onChangeViewMode: (mode: StudioViewMode) => void;
-  aspectRatio: AspectRatio;
-  onChangeAspectRatio: (ratio: AspectRatio) => void;
   onRandomizeTheme: () => void;
   currentTheme: ThemeConfig;
   isLeftPanelOpen: boolean;
@@ -30,8 +27,6 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenExport,
   viewMode,
   onChangeViewMode,
-  aspectRatio,
-  onChangeAspectRatio,
   onRandomizeTheme,
   currentTheme,
   isLeftPanelOpen,
@@ -65,33 +60,8 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Center: View Switcher, Format Toggle & Theme Shuffle */}
+      {/* Center: View Switcher & Theme Shuffle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {/* Format / Aspect Ratio Toggle: TikTok (9:16) vs Instagram (1:1) */}
-        <div className="toolbar-group" style={{ padding: '3px 4px' }}>
-          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--app-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '0 4px 0 6px' }}>
-            Size
-          </span>
-          <button
-            type="button"
-            className={`toolbar-toggle-btn ${aspectRatio === '9:16' ? 'active' : ''}`}
-            onClick={() => onChangeAspectRatio('9:16')}
-            title="TikTok Vertical Video (9:16)"
-          >
-            <Smartphone size={13} />
-            <span>9:16 TikTok</span>
-          </button>
-          <button
-            type="button"
-            className={`toolbar-toggle-btn ${aspectRatio === '1:1' ? 'active' : ''}`}
-            onClick={() => onChangeAspectRatio('1:1')}
-            title="Instagram Post Square (1:1)"
-          >
-            <Square size={13} />
-            <span>1:1 Square</span>
-          </button>
-        </div>
-
         {/* View Mode: Phone vs Storyboard */}
         <div className="toolbar-group">
           <button
