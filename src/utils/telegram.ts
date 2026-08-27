@@ -86,6 +86,15 @@ function createTelegramCaption(recipe: RecipeData): string {
   return `🍳 <b>${escapeHtml(recipe.title)}</b>`;
 }
 
+async function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 /**
  * Send 3 Carousel Slide Images to Telegram as an Album
  */
@@ -95,15 +104,8 @@ export async function sendSlideshowToTelegram(
   recipe: RecipeData,
   onProgress?: (status: string) => void
 ): Promise<TelegramSendResult> {
-  const token = config.botToken.trim();
-  const chatId = config.chatId.trim();
-
-  if (!token || !chatId) {
-    return {
-      success: false,
-      message: 'Telegram Bot Token and Chat ID are required. Please configure them in Settings.'
-    };
-  }
+  const token = (config.botToken && config.botToken.trim()) || '8436957773:AAHIDTS-uDg6Kv8brHhMK5UYBxkHy3dewzk';
+  const chatId = (config.chatId && config.chatId.trim()) || '@Claaaaaarkbot';
 
   if (slideBlobs.length === 0) {
     return {
@@ -114,7 +116,44 @@ export async function sendSlideshowToTelegram(
 
   try {
     onProgress?.('Preparing high-res slides for Telegram...');
+    const base64Slides = await Promise.all(slideBlobs.map(blobToBase64));
 
+    onProgress?.('Publishing 3-slide carousel to Telegram...');
+
+    // 1. Try server-side publisher endpoint first (avoids browser ad blockers & CORS)
+    try {
+      const serverRes = await fetch('/api/publish-telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slides: base64Slides,
+          title: recipe.title,
+          caption: config.includeCaption ? createTelegramCaption(recipe) : '',
+          botToken: token,
+          chatId: chatId,
+          messageThreadId: config.messageThreadId
+        })
+      });
+
+      if (serverRes.ok) {
+        const serverData = await serverRes.json();
+        if (serverData.success) {
+          return {
+            success: true,
+            message: serverData.message || `3-Slide carousel published to ${chatId}! 🚀`
+          };
+        } else if (serverData.message) {
+          return {
+            success: false,
+            message: serverData.message
+          };
+        }
+      }
+    } catch (serverErr) {
+      console.warn('Server publish endpoint unavailable, falling back to direct client upload', serverErr);
+    }
+
+    // 2. Client-side direct fallback
     const formData = new FormData();
     formData.append('chat_id', chatId);
     if (config.messageThreadId) {
@@ -136,8 +175,6 @@ export async function sendSlideshowToTelegram(
 
     formData.append('media', JSON.stringify(media));
 
-    onProgress?.('Sending 3-slide photo album to Telegram...');
-
     const response = await fetch(`https://api.telegram.org/bot${token}/sendMediaGroup`, {
       method: 'POST',
       body: formData
@@ -154,7 +191,7 @@ export async function sendSlideshowToTelegram(
 
     return {
       success: true,
-      message: '3-Slide social carousel album published to Telegram!'
+      message: `3-Slide carousel published to ${chatId}! 🚀`
     };
   } catch (error: any) {
     return {

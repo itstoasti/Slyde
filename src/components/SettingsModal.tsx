@@ -76,6 +76,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [aiConfig, setAiConfig] = useState<AIConfig>(() => getStoredAIConfig());
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showOpenRouterKey, setShowOpenRouterKey] = useState(false);
+  const [showBotToken, setShowBotToken] = useState(false);
   const [customOpenRouterModel, setCustomOpenRouterModel] = useState('');
   const [isTestingAi, setIsTestingAi] = useState(false);
   const [aiTestResult, setAiTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -856,13 +857,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </a>
                 </label>
 
-                <input
-                  type="password"
-                  className="form-input"
-                  placeholder="8436957773:AAGA7rl..."
-                  value={formData.botToken}
-                  onChange={(e) => setFormData({ ...formData, botToken: e.target.value })}
-                />
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input
+                    type={showBotToken ? 'text' : 'password'}
+                    className="form-input"
+                    style={{ paddingRight: 36 }}
+                    placeholder="8436957773:AAHIDTS..."
+                    value={formData.botToken}
+                    onChange={(e) => setFormData({ ...formData, botToken: e.target.value })}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowBotToken(prev => !prev)}
+                    style={{
+                      position: 'absolute',
+                      right: 10,
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--app-text-muted)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title={showBotToken ? 'Hide Bot Token' : 'Show Bot Token'}
+                  >
+                    {showBotToken ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
               </div>
 
               <div className="form-group">

@@ -32,16 +32,93 @@ function slydeServerPlugin() {
         }
 
         if (req.url === '/api/get-telegram-config' && req.method === 'GET') {
+          const defaultTelegram = {
+            botToken: '8436957773:AAHIDTS-uDg6Kv8brHhMK5UYBxkHy3dewzk',
+            chatId: '@Claaaaaarkbot',
+            includeCaption: true,
+            sendAsAlbum: true,
+            inboundListenerEnabled: true
+          };
           if (fs.existsSync(configPath)) {
             try {
-              const data = fs.readFileSync(configPath, 'utf-8');
+              const data = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
               res.setHeader('Content-Type', 'application/json');
-              res.end(data);
+              res.end(JSON.stringify({
+                ...defaultTelegram,
+                ...data,
+                botToken: data.botToken || defaultTelegram.botToken,
+                chatId: data.chatId || defaultTelegram.chatId
+              }));
               return;
             } catch (e) {}
           }
           res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ botToken: '', chatId: '' }));
+          res.end(JSON.stringify(defaultTelegram));
+          return;
+        }
+
+        if (req.url === '/api/publish-telegram' && req.method === 'POST') {
+          let body = '';
+          req.on('data', chunk => { body += chunk; });
+          req.on('end', async () => {
+            try {
+              const { slides = [], title = 'Recipe Carousel', caption, botToken: clientToken, chatId: clientChatId, messageThreadId } = JSON.parse(body);
+              const botToken = (clientToken && clientToken.trim()) || process.env.TELEGRAM_BOT_TOKEN || '8436957773:AAHIDTS-uDg6Kv8brHhMK5UYBxkHy3dewzk';
+              const chatId = (clientChatId && clientChatId.trim()) || process.env.TELEGRAM_CHAT_ID || '@Claaaaaarkbot';
+
+              const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
+              const parts = [];
+
+              parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n${chatId}\r\n`));
+              if (messageThreadId) {
+                parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="message_thread_id"\r\n\r\n${messageThreadId}\r\n`));
+              }
+
+              const formattedCaption = caption || `🍳 <b>${title}</b>`;
+              const mediaList = slides.map((_, idx) => ({
+                type: 'photo',
+                media: `attach://slide_${idx + 1}`,
+                caption: idx === 0 ? formattedCaption : undefined,
+                parse_mode: 'HTML'
+              }));
+
+              parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="media"\r\n\r\n${JSON.stringify(mediaList)}\r\n`));
+
+              for (let i = 0; i < slides.length; i++) {
+                let rawBase64 = slides[i];
+                if (typeof rawBase64 === 'string' && rawBase64.includes('base64,')) {
+                  rawBase64 = rawBase64.split('base64,')[1];
+                }
+                const buffer = Buffer.from(rawBase64, 'base64');
+                parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="slide_${i + 1}"; filename="slide-${i + 1}.png"\r\nContent-Type: image/png\r\n\r\n`));
+                parts.push(buffer);
+                parts.push(Buffer.from(`\r\n`));
+              }
+              parts.push(Buffer.from(`--${boundary}--\r\n`));
+
+              const reqBody = Buffer.concat(parts);
+              const telegramRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMediaGroup`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                  'Content-Length': String(reqBody.length)
+                },
+                body: reqBody
+              });
+
+              const telegramData = await telegramRes.json();
+              res.setHeader('Content-Type', 'application/json');
+              if (telegramData.ok) {
+                res.end(JSON.stringify({ success: true, message: `3-Slide carousel published to ${chatId}! 🚀` }));
+              } else {
+                res.end(JSON.stringify({ success: false, message: telegramData.description || 'Telegram API rejected media' }));
+              }
+            } catch (e) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, message: e.message }));
+            }
+          });
           return;
         }
 
