@@ -888,15 +888,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               <div className="form-group">
                 <label className="form-label">
-                  <span>Target Chat ID / Channel Username / Forum Topic ID</span>
+                  <span>Target Chat ID / Channel Username / Group ID</span>
                 </label>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="@yourchannel or -100123456789"
-                  value={formData.chatId || defaultChatId}
+                  placeholder="@yourchannel, -100123456789, or your numeric User ID"
+                  value={formData.chatId || ''}
                   onChange={(e) => setFormData({ ...formData, chatId: e.target.value })}
                 />
+                <div style={{ fontSize: '0.70rem', color: 'var(--app-text-muted)', marginTop: 4 }}>
+                  💡 To receive slides directly, enter your personal numeric Chat ID (message <code>/start</code> to @Claaaaaarkbot to see your ID) or your Channel username (e.g. <code>@mychannel</code> where @Claaaaaarkbot is added as an Admin).
+                </div>
               </div>
 
               <div className="form-group">

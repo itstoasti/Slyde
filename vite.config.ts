@@ -111,7 +111,11 @@ function slydeServerPlugin() {
               if (telegramData.ok) {
                 res.end(JSON.stringify({ success: true, message: `3-Slide carousel published to ${chatId}! 🚀` }));
               } else {
-                res.end(JSON.stringify({ success: false, message: telegramData.description || 'Telegram API rejected media' }));
+                let msg = telegramData.description || 'Telegram API rejected media';
+                if (msg.includes("bot can't send messages to the bot") || msg.includes('chat not found')) {
+                  msg = `Cannot send to "${chatId}" (bots cannot message themselves). In Settings, enter your personal numeric User ID (message /start to @Claaaaaarkbot to see it) or your Channel username (e.g. @mychannel).`;
+                }
+                res.end(JSON.stringify({ success: false, message: msg }));
               }
             } catch (e) {
               res.statusCode = 500;

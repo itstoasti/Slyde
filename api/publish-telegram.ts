@@ -92,9 +92,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const telegramData = await telegramRes.json();
 
     if (!telegramData.ok) {
+      let msg = telegramData.description || 'Telegram API rejected the media album.';
+      if (msg.includes("bot can't send messages to the bot") || msg.includes('chat not found')) {
+        msg = `Cannot send to "${chatId}" (bots cannot message themselves). In Settings, enter your personal numeric User ID (message /start to @Claaaaaarkbot to see it) or your Channel username (e.g. @mychannel).`;
+      }
       return res.status(200).json({
         success: false,
-        message: telegramData.description || 'Telegram API rejected the media album.'
+        message: msg
       });
     }
 
