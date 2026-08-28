@@ -2570,67 +2570,72 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 
 /* Slide 2 in 1:1 (Square Recipe Card) */
 .slide-2.aspect-1-1 {
-  padding: 6px 8px 3px 8px;
+  padding: 6px 9px 3px 9px;
   gap: 2px;
   justify-content: space-between;
 }
 
 .slide-2.aspect-1-1 .card-top-header {
-  margin-bottom: 1px;
+  margin-bottom: 1.5px;
   padding: 0 2px;
 }
 
 .slide-2.aspect-1-1 .card-eyebrow {
-  font-size: 0.48rem;
+  font-size: 0.50rem;
+  letter-spacing: 0.08em;
+  font-weight: 800;
 }
 
 .slide-2.aspect-1-1 .card-title {
-  font-size: 0.78rem;
-  line-height: 1.05;
+  font-size: 0.84rem;
+  font-weight: 800;
+  line-height: 1.10;
   max-width: 84%;
 }
 
 .slide-2.aspect-1-1 .card-header-thumbnail {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border-width: 1.5px;
 }
 
 .slide-2.aspect-1-1 .recipe-main-card {
-  padding: 3px 5px 3px 5px;
+  padding: 4px 6px 4px 6px;
   border-radius: 8px;
-  gap: 1.5px;
+  gap: 2px;
   flex: 1;
   min-height: 0;
 }
 
 .slide-2.aspect-1-1 .section-title {
-  font-size: 0.52rem;
+  font-size: 0.54rem;
+  font-weight: 800;
   gap: 2.5px;
-  margin-bottom: 1px;
+  margin-bottom: 1.5px;
 }
 
 .slide-2.aspect-1-1 .ingredients-grid {
-  gap: 1.5px;
-  margin-bottom: 1px;
+  gap: 2px;
+  margin-bottom: 1.5px;
 }
 
 .slide-2.aspect-1-1 .ingredient-pill {
-  padding: 1px 3px;
-  min-height: 11px;
-  border-radius: 2.5px;
-  gap: 2px;
+  padding: 1.5px 4.5px;
+  min-height: 13px;
+  border-radius: 3px;
+  gap: 2.5px;
 }
 
 .slide-2.aspect-1-1 .ing-dot {
-  width: 2px;
-  height: 2px;
+  width: 2.5px;
+  height: 2.5px;
   flex-shrink: 0;
 }
 
 .slide-2.aspect-1-1 .ing-text {
-  font-size: calc(0.50rem * var(--font-scale, 1));
-  line-height: 1.0;
+  font-size: calc(0.55rem * var(--font-scale, 1));
+  font-weight: 600;
+  line-height: 1.10;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2644,39 +2649,42 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .slide-2.aspect-1-1 .method-list {
-  gap: 1px;
+  gap: 1.5px;
 }
 
 .slide-2.aspect-1-1 .method-step-item {
-  padding: 1px 3.5px;
-  gap: 3px;
-  border-radius: 3px;
+  padding: 1.5px 4.5px;
+  gap: 3.5px;
+  border-radius: 3.5px;
 }
 
 .slide-2.aspect-1-1 .step-number-badge {
-  width: 10.5px;
-  height: 10.5px;
-  font-size: 0.42rem;
-  border-radius: 2px;
+  width: 13px;
+  height: 13px;
+  font-size: 0.48rem;
+  font-weight: 800;
+  border-radius: 2.5px;
   margin-top: 0.5px;
   flex-shrink: 0;
 }
 
 .slide-2.aspect-1-1 .step-text,
 .slide-2.aspect-1-1 .step-instruction-text {
-  font-size: calc(0.50rem * var(--font-scale, 1));
-  line-height: 1.05;
+  font-size: calc(0.64rem * var(--font-scale, 1));
+  font-weight: 600;
+  line-height: 1.18;
+  color: #111827;
 }
 
 .slide-2.aspect-1-1 .card-safe-stat-bar {
-  padding: 1.5px 6px;
-  margin-top: 1px;
+  padding: 1.5px 7px;
+  margin-top: 1.5px;
   margin-bottom: 0px;
   gap: 4px;
   height: 19px;
   flex-shrink: 0;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
   align-self: center;
 }

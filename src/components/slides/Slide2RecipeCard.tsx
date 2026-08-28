@@ -8,6 +8,64 @@ interface Slide2RecipeCardProps {
   aspectRatio: AspectRatio;
 }
 
+// Cleans up conversational blog filler for punchy, high-legibility slide cards
+function simplifyStepForSlide(step: string, isCompactMode: boolean): string {
+  if (!step) return '';
+  let clean = step.trim()
+    .replace(/^Step\s*\d+[:.]\s*/i, '')
+    .replace(/^\d+[:.]\s*/, '')
+    .replace(/Recipe developed by.*/i, '')
+    .replace(/\s+Enjoy!?$/i, '')
+    .replace(/\s+/g, ' ');
+
+  if (isCompactMode) {
+    clean = clean
+      .replace(/together in a large bowl/gi, 'in a bowl')
+      .replace(/together in a bowl/gi, 'in a bowl')
+      .replace(/in a separate bowl,?\s*/gi, 'separately, ')
+      .replace(/In a separate bowl,?\s*/gi, 'Separately, ')
+      .replace(/for dipping\.?\s*/gi, '. ')
+      .replace(/You may have to work in batches\.?\s*/gi, '')
+      .replace(/Repeat with remaining fritter batter\.?\s*/gi, '')
+      .replace(/Repeat with remaining.*?\./gi, '')
+      .replace(/Check the consistency of the batter\.\s*/gi, '')
+      .replace(/Pour enough oil to generously coat the bottom of a large nonstick pan\.\s*/gi, 'Heat oil in pan. ')
+      .replace(/Heat the oil to medium-high\.\s*/gi, 'Heat over medium-high. ')
+      .replace(/Using a \d+[\s-]ounce (?:ice cream )?scoop,?\s*/gi, 'Scoop ')
+      .replace(/portion the batter into the hot oil\.\s*/gi, 'batter into pan. ')
+      .replace(/Turn over and press down slightly\.\s*Turn again and fry/gi, 'Flip, press slightly, and fry')
+      .replace(/Finish with one last drizzle of/gi, 'Top with')
+      .replace(/Serve the warm corn fritters with a generous bowl of/gi, 'Serve warm fritters with')
+      .replace(/Maldon salt, and a sprinkle of fresh chives/gi, 'flaky salt & chives')
+      .trim();
+
+    if (clean.length > 120) {
+      const sentences = clean.split(/(?<=[.!?])\s+/);
+      let accum = '';
+      for (const sent of sentences) {
+        if (!accum) {
+          accum = sent;
+        } else if ((accum + ' ' + sent).length <= 125) {
+          accum += ' ' + sent;
+        } else {
+          break;
+        }
+      }
+      if (accum && accum.length >= 30) {
+        clean = accum;
+      }
+    }
+
+    if (clean.length > 130) {
+      const cut = clean.substring(0, 125);
+      const lastSpace = cut.lastIndexOf(' ');
+      clean = (lastSpace > 75 ? cut.substring(0, lastSpace) : cut) + '...';
+    }
+  }
+
+  return clean;
+}
+
 export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, theme, aspectRatio }) => {
   const config: Slide2LayoutConfig = recipe.slide2Config || {
     density: 'auto',
@@ -49,43 +107,44 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
     }
   }
 
-  // 2, 3 or 4 columns for ingredients to minimize vertical space
+  // 2 or 3 columns for ingredients
   let computedColumns = config.ingredientColumns;
   if (computedColumns === 'auto') {
     if (aspectRatio === '1:1') {
-      computedColumns = numIngs >= 9 ? '4' : numIngs >= 5 ? '3' : numIngs >= 3 ? '2' : '1';
+      computedColumns = numIngs >= 6 ? '3' : numIngs >= 3 ? '2' : '1';
     } else {
       computedColumns = numIngs >= 8 ? '3' : numIngs >= 4 ? '2' : '1';
     }
   }
 
-  // Proportional Auto-Fit Font Scaling
+  // Proportional Auto-Fit Font Scaling with high minimum floor for accessibility & readability
   let autoFontScale = 1.0;
   if (recipe.slide2Config?.fontScale && recipe.slide2Config.fontScale !== 1.0) {
     autoFontScale = recipe.slide2Config.fontScale;
   } else if (aspectRatio === '1:1') {
-    if (totalChars > 1100 || (numSteps >= 5 && methodChars > 650)) {
-      autoFontScale = 0.67;
-    } else if (totalChars > 750 || (numSteps >= 5 && methodChars > 450)) {
-      autoFontScale = 0.72;
-    } else if (numSteps >= 6 || totalChars > 450) {
-      autoFontScale = 0.76;
-    } else if (numSteps >= 5 || totalChars > 320) {
-      autoFontScale = 0.80;
-    } else if (numSteps >= 4 || totalChars > 220) {
-      autoFontScale = 0.86;
-    } else {
+    if (numSteps >= 6) {
+      autoFontScale = 0.88;
+    } else if (numSteps >= 5) {
       autoFontScale = 0.92;
+    } else if (numSteps >= 4) {
+      autoFontScale = 0.96;
+    } else {
+      autoFontScale = 1.0;
     }
   } else if (numSteps >= 6 || totalChars > 500) {
-    autoFontScale = 0.74;
+    autoFontScale = 0.84;
   } else if (numSteps >= 5 || totalChars > 360) {
-    autoFontScale = 0.80;
+    autoFontScale = 0.90;
   } else if (numSteps >= 4 || totalChars > 260) {
-    autoFontScale = 0.86;
-  } else {
     autoFontScale = 0.94;
+  } else {
+    autoFontScale = 1.0;
   }
+
+  // In 1:1 square with heavy ingredients (> 8 items), show top 7 + badge to keep directions large & readable
+  const shouldCapIngredients = aspectRatio === '1:1' && numIngs > 8;
+  const displayIngredients = shouldCapIngredients ? recipe.ingredients.slice(0, 7) : recipe.ingredients;
+  const remainingIngCount = shouldCapIngredients ? numIngs - 7 : 0;
 
   // Background style based on cardStyle
   let cardBg = theme.bgCard;
@@ -142,7 +201,7 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
           <div 
             className={`ingredients-grid cols-${computedColumns} ${numIngs >= 8 ? 'grid-dense' : ''}`}
           >
-            {recipe.ingredients.map((ing, idx) => (
+            {displayIngredients.map((ing, idx) => (
               <div key={idx} className="ingredient-pill">
                 <span className="ing-dot"></span>
                 <span className="ing-text">
@@ -151,6 +210,14 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
                 </span>
               </div>
             ))}
+            {remainingIngCount > 0 && (
+              <div className="ingredient-pill ingredient-pill-more">
+                <span className="ing-dot" style={{ background: 'var(--accent-color)' }}></span>
+                <span className="ing-text" style={{ fontWeight: 700, color: 'var(--accent-color)' }}>
+                  +{remainingIngCount} more in caption
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -163,7 +230,7 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
             {recipe.method.map((step, idx) => (
               <div key={idx} className="method-step-item">
                 <div className="step-number-badge">{idx + 1}</div>
-                <div className="step-text">{step}</div>
+                <div className="step-text">{simplifyStepForSlide(step, isHeavyContent || aspectRatio === '1:1')}</div>
               </div>
             ))}
           </div>
