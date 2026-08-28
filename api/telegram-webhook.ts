@@ -251,7 +251,7 @@ Save this recipe on ${brandName} — skip the life story, get straight to cookin
 }
 
 // Render 3 Slides with Serverless Chromium, then stitch video with ffmpeg
-async function captureMediaServerless(recipe: any, host: string, includeVideo: boolean = true): Promise<{ slides: (Buffer | Uint8Array)[]; videoBuffer: Buffer | null; videoError?: string | null }> {
+async function captureMediaServerless(recipe: any, host: string, includeVideo: boolean = true, aspectRatio: '9:16' | '1:1' | '4:5' = '9:16'): Promise<{ slides: (Buffer | Uint8Array)[]; videoBuffer: Buffer | null; videoError?: string | null }> {
   let executablePath: string;
   try {
     executablePath = await chromium.executablePath();
@@ -274,9 +274,9 @@ async function captureMediaServerless(recipe: any, host: string, includeVideo: b
 
     await page.waitForFunction(() => typeof (window as any).__setRecipe === 'function', { timeout: 12000 });
 
-    await page.evaluate((r) => {
-      (window as any).__setRecipe(r);
-    }, recipe);
+    await page.evaluate((r, ratio) => {
+      (window as any).__setRecipe(r, undefined, ratio);
+    }, recipe, aspectRatio);
 
     await page.waitForSelector('#slide-1', { timeout: 12000 });
     await page.waitForSelector('#slide-2', { timeout: 12000 });
@@ -537,7 +537,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       botToken,
       chatId,
       messageThreadId,
-      `🎬 <b>Welcome to Slyde Automation Bot!</b>\n\nSend me <b>any recipe URL</b> or use commands:\n\n🎥 <b>/video &lt;url&gt;</b> — 9.0s 9:16 Video (Ready for YouTube Shorts & TikTok)\n📸 <b>/slides &lt;url&gt;</b> — 3-Slide Carousel Album (Instagram & Threads)\n⚡ <b>/all &lt;url&gt;</b> (or paste any URL) — Both Video + 3 Slides + Caption\n📋 <b>/caption &lt;url&gt;</b> — Viral Social Caption only\n\n🆔 <i>Your Chat ID: <code>${chatId}</code></i>\n\n<i>💡 Tip: Tap and save the video directly to your phone camera roll to add trending sounds in the YouTube Shorts or TikTok app!</i>`
+      `🎬 <b>Welcome to Slyde Automation Bot!</b>\n\nSend me <b>any recipe URL</b> or use commands:\n\n📸 <b>/slides 1:1 &lt;url&gt;</b> — 1:1 Square Carousel (Instagram & Threads)\n📸 <b>/slides 4:5 &lt;url&gt;</b> — 4:5 Portrait Carousel (Instagram Feed)\n📸 <b>/slides 9:16 &lt;url&gt;</b> — 9:16 Vertical Carousel (TikTok & Stories)\n🎥 <b>/video &lt;url&gt;</b> — 9.0s 9:16 Video (YouTube Shorts & Reels)\n⚡ <b>/all &lt;url&gt;</b> (or paste any URL) — Both Video + 3 Slides + Caption\n📋 <b>/caption &lt;url&gt;</b> — Viral Social Caption only\n\n💡 <i>Shortcuts:</i>\n• <code>/slide 1:1 &lt;url&gt;</code> or <code>/square &lt;url&gt;</code>\n• <code>/slide 4:5 &lt;url&gt;</code> or <code>/portrait &lt;url&gt;</code>\n• <code>/slide 9:16 &lt;url&gt;</code> or <code>/slide &lt;url&gt;</code>\n\n🆔 <i>Your Chat ID: <code>${chatId}</code></i>`
     );
     return res.status(200).send('OK');
   }
@@ -547,11 +547,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const recipeUrl = urlMatch[0];
     const lowerText = text.toLowerCase().trim();
 
+    let requestedAspectRatio: '9:16' | '1:1' | '4:5' = '9:16';
+    if (lowerText.includes('1:1') || lowerText.includes('square') || lowerText.startsWith('/sq')) {
+      requestedAspectRatio = '1:1';
+    } else if (lowerText.includes('4:5') || lowerText.includes('portrait') || lowerText.includes('feed')) {
+      requestedAspectRatio = '4:5';
+    } else if (lowerText.includes('9:16') || lowerText.includes('vertical') || lowerText.includes('story') || lowerText.includes('reel') || lowerText.includes('tiktok')) {
+      requestedAspectRatio = '9:16';
+    }
+
     const isVideoOnly = lowerText.startsWith('/video') || lowerText.startsWith('/short') || lowerText.startsWith('/reel') || lowerText.startsWith('/v ');
-    const isSlidesOnly = lowerText.startsWith('/slides') || lowerText.startsWith('/carousel') || lowerText.startsWith('/album') || lowerText.startsWith('/s ');
+    const isSlidesOnly = lowerText.startsWith('/slides') || lowerText.startsWith('/slide') || lowerText.startsWith('/carousel') || lowerText.startsWith('/album') || lowerText.startsWith('/s ') || lowerText.startsWith('/square') || lowerText.startsWith('/sq') || lowerText.startsWith('/portrait');
     const isCaptionOnly = lowerText.startsWith('/caption') || lowerText.startsWith('/c ');
 
-    const modeText = isVideoOnly ? '🎬 9.0s Video' : (isSlidesOnly ? '📸 3 Social Slides' : '⚡ 9.0s Video + 3 Slides');
+    const ratioLabel = requestedAspectRatio === '1:1' ? ' [1:1 Square]' : (requestedAspectRatio === '4:5' ? ' [4:5 Portrait]' : ' [9:16 Vertical]');
+    const modeText = isVideoOnly ? '🎬 9.0s Video' : (isSlidesOnly ? `📸 3 Social Slides${ratioLabel}` : `⚡ 9.0s Video + 3 Slides${ratioLabel}`);
 
     // Run processing asynchronously with Vercel waitUntil and return 200 OK immediately
     waitUntil((async () => {
@@ -576,7 +586,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // 3. Render slides & video with Serverless Chromium
         try {
           const needsVideo = isVideoOnly || !isSlidesOnly;
-          const media = await captureMediaServerless(recipe, host, needsVideo);
+          const media = await captureMediaServerless(recipe, host, needsVideo, requestedAspectRatio);
 
           // Send Video if requested
           if (isVideoOnly || !isSlidesOnly) {

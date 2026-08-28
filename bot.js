@@ -335,7 +335,7 @@ Save this recipe on ${recipe.brandName} — skip the life story, get straight to
 /**
  * Capture 3 High-Res PNG Slides via Headless Chrome
  */
-async function captureSlidesWithPuppeteer(recipe) {
+async function captureSlidesWithPuppeteer(recipe, aspectRatio = '9:16') {
   const browser = await puppeteer.launch({
     executablePath: CHROME_PATH,
     headless: true,
@@ -349,9 +349,9 @@ async function captureSlidesWithPuppeteer(recipe) {
     await page.goto('http://localhost:3000/render.html', { waitUntil: 'networkidle0' });
 
     // Inject recipe into React Render Harness
-    await page.evaluate((r) => {
-      window.__setRecipe(r);
-    }, recipe);
+    await page.evaluate((r, ratio) => {
+      window.__setRecipe(r, undefined, ratio);
+    }, recipe, aspectRatio);
 
     // Wait for fonts and hero image to load
     await new Promise(r => setTimeout(r, 900));
@@ -542,7 +542,7 @@ async function pollUpdates() {
             body: JSON.stringify({
               chat_id: chatId,
               ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
-              text: `🎬 <b>Welcome to Slyde Automation Bot!</b>\n\nSend me <b>any recipe URL</b> or use commands:\n\n🎥 <b>/video &lt;url&gt;</b> — 60 FPS 9:16 Video (Ready for YouTube Shorts & TikTok)\n📸 <b>/slides &lt;url&gt;</b> — 3-Slide Carousel Album (Instagram & Threads)\n⚡ <b>/all &lt;url&gt;</b> (or paste any URL) — Both Video + 3 Slides + Caption\n📋 <b>/caption &lt;url&gt;</b> — Viral Social Caption only\n\n<i>💡 Tip: Tap and save the video directly to your phone camera roll to add trending sounds in the YouTube Shorts or TikTok app!</i>`,
+              text: `🎬 <b>Welcome to Slyde Automation Bot!</b>\n\nSend me <b>any recipe URL</b> or use commands:\n\n📸 <b>/slides 1:1 &lt;url&gt;</b> — 1:1 Square Carousel (Instagram & Threads)\n📸 <b>/slides 4:5 &lt;url&gt;</b> — 4:5 Portrait Carousel (Instagram Feed)\n📸 <b>/slides 9:16 &lt;url&gt;</b> — 9:16 Vertical Carousel (TikTok & Stories)\n🎥 <b>/video &lt;url&gt;</b> — 60 FPS 9:16 Video (Ready for YouTube Shorts & TikTok)\n⚡ <b>/all &lt;url&gt;</b> (or paste any URL) — Both Video + 3 Slides + Caption\n📋 <b>/caption &lt;url&gt;</b> — Viral Social Caption only\n\n💡 <i>Shortcuts:</i>\n• <code>/slide 1:1 &lt;url&gt;</code> or <code>/square &lt;url&gt;</code>\n• <code>/slide 4:5 &lt;url&gt;</code> or <code>/portrait &lt;url&gt;</code>\n• <code>/slide 9:16 &lt;url&gt;</code> or <code>/slide &lt;url&gt;</code>\n\n<i>💡 Tip: Tap and save the video directly to your phone camera roll to add trending sounds in the YouTube Shorts or TikTok app!</i>`,
               parse_mode: 'HTML'
             })
           });
@@ -554,11 +554,21 @@ async function pollUpdates() {
           const recipeUrl = urlMatch[0];
           const lowerText = text.toLowerCase().trim();
 
+          let requestedAspectRatio = '9:16';
+          if (lowerText.includes('1:1') || lowerText.includes('square') || lowerText.startsWith('/sq')) {
+            requestedAspectRatio = '1:1';
+          } else if (lowerText.includes('4:5') || lowerText.includes('portrait') || lowerText.includes('feed')) {
+            requestedAspectRatio = '4:5';
+          } else if (lowerText.includes('9:16') || lowerText.includes('vertical') || lowerText.includes('story') || lowerText.includes('reel') || lowerText.includes('tiktok')) {
+            requestedAspectRatio = '9:16';
+          }
+
           const isVideoOnly = lowerText.startsWith('/video') || lowerText.startsWith('/short') || lowerText.startsWith('/reel') || lowerText.startsWith('/v ');
-          const isSlidesOnly = lowerText.startsWith('/slides') || lowerText.startsWith('/carousel') || lowerText.startsWith('/album') || lowerText.startsWith('/s ');
+          const isSlidesOnly = lowerText.startsWith('/slides') || lowerText.startsWith('/slide') || lowerText.startsWith('/carousel') || lowerText.startsWith('/album') || lowerText.startsWith('/s ') || lowerText.startsWith('/square') || lowerText.startsWith('/sq') || lowerText.startsWith('/portrait');
           const isCaptionOnly = lowerText.startsWith('/caption') || lowerText.startsWith('/c ');
 
-          const modeText = isVideoOnly ? '🎬 60 FPS Video' : (isSlidesOnly ? '📸 3 Social Slides' : '⚡ 60 FPS Video + 3 Slides');
+          const ratioLabel = requestedAspectRatio === '1:1' ? ' [1:1 Square]' : (requestedAspectRatio === '4:5' ? ' [4:5 Portrait]' : ' [9:16 Vertical]');
+          const modeText = isVideoOnly ? '🎬 60 FPS Video' : (isSlidesOnly ? `📸 3 Social Slides${ratioLabel}` : `⚡ 60 FPS Video + 3 Slides${ratioLabel}`);
           console.log('\x1b[32m%s\x1b[0m', `👨‍🍳 [Slyde Bot] Processing [${modeText}] from @${user}: ${recipeUrl}`);
 
           // 1. Send immediate progress acknowledgment
@@ -595,8 +605,8 @@ async function pollUpdates() {
             }
 
             // 2. Render all 3 slides using Headless Chrome (Exact React DOM fidelity)
-            console.log('\x1b[35m%s\x1b[0m', `📸 [Slyde Bot] Rendering exact React slides for "${recipe.title}"...`);
-            const [buf1, buf2, buf3] = await captureSlidesWithPuppeteer(recipe);
+            console.log('\x1b[35m%s\x1b[0m', `📸 [Slyde Bot] Rendering exact React slides (${requestedAspectRatio}) for "${recipe.title}"...`);
+            const [buf1, buf2, buf3] = await captureSlidesWithPuppeteer(recipe, requestedAspectRatio);
 
             // If video requested or full mode (/all or raw link), render 60 FPS video
             if (isVideoOnly || !isSlidesOnly) {

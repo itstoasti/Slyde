@@ -246,7 +246,10 @@ const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
       theme,
       brandDefaults,
       {
-        onRecipeReceived: (newRecipe, senderName) => {
+        onRecipeReceived: (newRecipe, senderName, requestedAspectRatio) => {
+          if (requestedAspectRatio) {
+            handleAspectRatioChange(requestedAspectRatio);
+          }
           setRecipesQueue(prev => {
             const exists = prev.find(r => r.id === newRecipe.id);
             if (exists) return prev;
@@ -254,7 +257,7 @@ const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
           });
           setActiveRecipeId(newRecipe.id);
           setCurrentSlide(0);
-          showToast(`⚡ Telegram: Generated 3 slides for "${newRecipe.title}" from @${senderName}!`, 'success');
+          showToast(`⚡ Telegram: Generated 3 slides (${requestedAspectRatio || aspectRatio}) for "${newRecipe.title}" from @${senderName}!`, 'success');
           confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
         },
         onStatusUpdate: (status) => {

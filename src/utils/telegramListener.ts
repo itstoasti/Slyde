@@ -1,11 +1,11 @@
-import { RecipeData, TelegramConfig, ThemeConfig } from '../types';
+import { RecipeData, TelegramConfig, ThemeConfig, AspectRatio } from '../types';
 import { extractRecipeFromUrl } from './recipeExtractor';
 import { sendSlideshowToTelegram } from './telegram';
 import { captureSlideAsBlob } from './exporter';
 import { generateBothSocialCaptions } from './geminiCaption';
 
 export interface TelegramListenerCallbacks {
-  onRecipeReceived: (recipe: RecipeData, senderName: string) => void;
+  onRecipeReceived: (recipe: RecipeData, senderName: string, requestedAspectRatio?: AspectRatio) => void;
   onStatusUpdate: (statusText: string) => void;
   slide1Ref: React.RefObject<HTMLDivElement>;
   slide2Ref: React.RefObject<HTMLDivElement>;
@@ -49,7 +49,19 @@ export async function startTelegramListener(
             const urlMatch = text.match(/https?:\/\/[^\s]+/i);
             if (urlMatch) {
               const recipeUrl = urlMatch[0];
-              callbacks.onStatusUpdate(`📥 Received recipe link from @${message.from?.username || senderName}: ${recipeUrl}`);
+              const lowerText = text.toLowerCase();
+
+              let requestedAspectRatio: AspectRatio | undefined;
+              if (lowerText.includes('1:1') || lowerText.includes('square') || lowerText.startsWith('/sq')) {
+                requestedAspectRatio = '1:1';
+              } else if (lowerText.includes('4:5') || lowerText.includes('portrait') || lowerText.includes('feed')) {
+                requestedAspectRatio = '4:5';
+              } else if (lowerText.includes('9:16') || lowerText.includes('vertical') || lowerText.includes('story') || lowerText.includes('reel') || lowerText.includes('tiktok')) {
+                requestedAspectRatio = '9:16';
+              }
+
+              const ratioTag = requestedAspectRatio ? ` [${requestedAspectRatio}]` : '';
+              callbacks.onStatusUpdate(`📥 Received recipe link${ratioTag} from @${message.from?.username || senderName}: ${recipeUrl}`);
 
               // 1. Send immediate progress acknowledgment in Telegram
               await fetch(`https://api.telegram.org/bot${config.botToken.trim()}/sendMessage`, {
@@ -58,14 +70,14 @@ export async function startTelegramListener(
                 body: JSON.stringify({
                   chat_id: chatId,
                   ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
-                  text: `👨‍🍳 <b>Extracting recipe & rendering 3 social slides...</b>`,
+                  text: `👨‍🍳 <b>Extracting recipe & rendering 3 social slides${ratioTag}...</b>`,
                   parse_mode: 'HTML'
                 })
               });
 
               // 2. Extract recipe data
               const recipe = await extractRecipeFromUrl(recipeUrl, brandDefaults);
-              callbacks.onRecipeReceived(recipe, senderName);
+              callbacks.onRecipeReceived(recipe, senderName, requestedAspectRatio);
 
               // 3. Wait for React DOM to render the new recipe in slide DOM nodes
               await new Promise(r => setTimeout(r, 1400));
