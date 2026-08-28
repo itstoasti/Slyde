@@ -111,7 +111,7 @@ async function extractRecipeServer(recipeUrl: string) {
   const calories = cleanCalories(recipeObj?.nutrition?.calories);
 
   const rawIngredients = Array.isArray(recipeObj?.recipeIngredient) ? recipeObj.recipeIngredient : [];
-  const ingredients = rawIngredients.slice(0, 12).map((i: string) => {
+  const ingredients = rawIngredients.slice(0, 16).map((i: string) => {
     const clean = decodeEntities(i).trim();
     return { name: clean, amount: '' };
   });

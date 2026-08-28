@@ -66,6 +66,35 @@ function simplifyStepForSlide(step: string, isCompactMode: boolean): string {
   return clean;
 }
 
+// Cleans up wordy blog ingredient strings for compact, non-truncated slide cards
+function cleanIngredientForSlide(name: string): string {
+  if (!name) return '';
+  return name.trim()
+    .replace(/such as .*?(?=(,|$|\.))/gi, '')
+    .replace(/,\s*such as.*/gi, '')
+    .replace(/,\s*divided/gi, '')
+    .replace(/,\s*cut from the cob/gi, '')
+    .replace(/,\s*or to taste/gi, '')
+    .replace(/,\s*plus more for serving/gi, '')
+    .replace(/,\s*melted/gi, '')
+    .replace(/freshly ground\s*/gi, '')
+    .replace(/fresh cracked\s*/gi, '')
+    .replace(/finely ground\s*/gi, '')
+    .replace(/chopped fresh\s*/gi, '')
+    .replace(/chopped\s*/gi, '')
+    .replace(/all-purpose\s*/gi, 'AP ')
+    .replace(/All-purpose\s*/gi, 'AP ')
+    .replace(/tablespoons?\b/gi, 'tbsp')
+    .replace(/teaspoons?\b/gi, 'tsp')
+    .replace(/kernels\b/gi, '')
+    .replace(/Maldon salt and fresh cracked black pepper/gi, 'Salt & black pepper')
+    .replace(/Maldon salt and/gi, 'Salt &')
+    .replace(/Dash of\s*/gi, '')
+    .replace(/,\s*$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, theme, aspectRatio }) => {
   const config: Slide2LayoutConfig = recipe.slide2Config || {
     density: 'auto',
@@ -141,11 +170,6 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
     autoFontScale = 1.0;
   }
 
-  // In 1:1 square with heavy ingredients (> 8 items), show top 7 + badge to keep directions large & readable
-  const shouldCapIngredients = aspectRatio === '1:1' && numIngs > 8;
-  const displayIngredients = shouldCapIngredients ? recipe.ingredients.slice(0, 7) : recipe.ingredients;
-  const remainingIngCount = shouldCapIngredients ? numIngs - 7 : 0;
-
   // Background style based on cardStyle
   let cardBg = theme.bgCard;
   let textDark = theme.textDark;
@@ -201,23 +225,15 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
           <div 
             className={`ingredients-grid cols-${computedColumns} ${numIngs >= 8 ? 'grid-dense' : ''}`}
           >
-            {displayIngredients.map((ing, idx) => (
+            {recipe.ingredients.map((ing, idx) => (
               <div key={idx} className="ingredient-pill">
                 <span className="ing-dot"></span>
                 <span className="ing-text">
-                  <span className="ing-name">{ing.name}</span>
+                  <span className="ing-name">{cleanIngredientForSlide(ing.name)}</span>
                   {ing.amount && <span className="ing-amount"> — {ing.amount}</span>}
                 </span>
               </div>
             ))}
-            {remainingIngCount > 0 && (
-              <div className="ingredient-pill ingredient-pill-more">
-                <span className="ing-dot" style={{ background: 'var(--accent-color)' }}></span>
-                <span className="ing-text" style={{ fontWeight: 700, color: 'var(--accent-color)' }}>
-                  +{remainingIngCount} more in caption
-                </span>
-              </div>
-            )}
           </div>
         </div>
 
