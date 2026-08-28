@@ -49,13 +49,13 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
     }
   }
 
-  // 2 or 3 columns for ingredients to minimize vertical space
+  // 2, 3 or 4 columns for ingredients to minimize vertical space
   let computedColumns = config.ingredientColumns;
   if (computedColumns === 'auto') {
     if (aspectRatio === '1:1') {
-      computedColumns = numIngs >= 6 ? '3' : numIngs >= 3 ? '2' : '1';
+      computedColumns = numIngs >= 9 ? '4' : numIngs >= 5 ? '3' : numIngs >= 3 ? '2' : '1';
     } else {
-      computedColumns = numIngs >= 4 ? '2' : '1';
+      computedColumns = numIngs >= 8 ? '3' : numIngs >= 4 ? '2' : '1';
     }
   }
 
@@ -64,8 +64,12 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
   if (recipe.slide2Config?.fontScale && recipe.slide2Config.fontScale !== 1.0) {
     autoFontScale = recipe.slide2Config.fontScale;
   } else if (aspectRatio === '1:1') {
-    if (numSteps >= 6 || totalChars > 450) {
-      autoFontScale = 0.74;
+    if (totalChars > 1100 || (numSteps >= 5 && methodChars > 650)) {
+      autoFontScale = 0.67;
+    } else if (totalChars > 750 || (numSteps >= 5 && methodChars > 450)) {
+      autoFontScale = 0.72;
+    } else if (numSteps >= 6 || totalChars > 450) {
+      autoFontScale = 0.76;
     } else if (numSteps >= 5 || totalChars > 320) {
       autoFontScale = 0.80;
     } else if (numSteps >= 4 || totalChars > 220) {

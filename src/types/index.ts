@@ -10,7 +10,7 @@ export interface PerkItem {
 }
 
 export type DensityMode = 'auto' | 'spacious' | 'standard' | 'compact' | 'micro';
-export type ColumnMode = 'auto' | '1' | '2' | '3';
+export type ColumnMode = 'auto' | '1' | '2' | '3' | '4';
 export type SplitMode = 'auto' | 'balanced' | 'more-ingredients' | 'more-method';
 export type CardStyle = 'cream' | 'pure-white' | 'dark-glass' | 'soft-warm';
 
