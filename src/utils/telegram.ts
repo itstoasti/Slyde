@@ -1,4 +1,5 @@
 import { RecipeData, TelegramConfig } from '../types';
+import { formatCompleteSocialCaption } from './aiCaption';
 
 export interface TelegramTestResult {
   success: boolean;
@@ -79,11 +80,8 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;');
 }
 
-/**
- * Clean minimal title for Telegram
- */
-function createTelegramCaption(recipe: RecipeData): string {
-  return `🍳 <b>${escapeHtml(recipe.title)}</b>`;
+export function createTelegramCaption(recipe: RecipeData): string {
+  return formatCompleteSocialCaption(recipe);
 }
 
 async function blobToBase64(blob: Blob): Promise<string> {
@@ -116,7 +114,10 @@ export async function sendSlideshowToTelegram(
     };
   }
 
-  const activeCaption = customCaption?.trim() || (config.includeCaption ? createTelegramCaption(recipe) : '');
+  const fallbackCaption = formatCompleteSocialCaption(recipe);
+  const activeCaption = (customCaption && customCaption.trim().length > 30)
+    ? customCaption.trim()
+    : (config.includeCaption ? fallbackCaption : '');
 
   try {
     onProgress?.('Preparing high-res slides for Telegram...');

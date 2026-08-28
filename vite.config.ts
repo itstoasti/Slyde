@@ -75,11 +75,11 @@ function slydeServerPlugin() {
                 parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="message_thread_id"\r\n\r\n${messageThreadId}\r\n`));
               }
 
-              const formattedCaption = caption || `🍳 <b>${title}</b>`;
+              const shortAlbumHook = `🍳 <b>${title}</b>`;
               const mediaList = slides.map((_, idx) => ({
                 type: 'photo',
                 media: `attach://slide_${idx + 1}`,
-                caption: idx === 0 ? formattedCaption : undefined,
+                caption: idx === 0 ? shortAlbumHook : undefined,
                 parse_mode: 'HTML'
               }));
 

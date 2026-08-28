@@ -29,19 +29,19 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
   let computedDensity = config.density;
   if (computedDensity === 'auto') {
     if (aspectRatio === '1:1') {
-      if (numSteps >= 5 || totalChars > 400 || numIngs >= 7) {
+      if (numSteps >= 5 || totalChars > 340 || numIngs >= 6) {
         computedDensity = 'micro';
-      } else if (numSteps >= 4 || numIngs >= 5 || totalChars > 260) {
+      } else if (numSteps >= 4 || numIngs >= 4 || totalChars > 220) {
         computedDensity = 'compact';
       } else {
         computedDensity = 'standard';
       }
     } else {
-      if (numSteps >= 6 || (numSteps >= 5 && totalChars > 500)) {
+      if (numSteps >= 5 || totalChars > 360 || numIngs >= 7) {
         computedDensity = 'micro';
-      } else if (numSteps >= 5 || numIngs > 6 || totalChars > 380) {
+      } else if (numSteps >= 4 || numIngs >= 5 || totalChars > 260) {
         computedDensity = 'compact';
-      } else if (numIngs <= 4 && numSteps <= 3 && totalChars < 200) {
+      } else if (numIngs <= 4 && numSteps <= 3 && totalChars < 180) {
         computedDensity = 'spacious';
       } else {
         computedDensity = 'standard';
@@ -49,13 +49,13 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
     }
   }
 
-  // 2 or 3 columns for ingredients in square mode to minimize vertical space
+  // 2 or 3 columns for ingredients to minimize vertical space
   let computedColumns = config.ingredientColumns;
   if (computedColumns === 'auto') {
     if (aspectRatio === '1:1') {
       computedColumns = numIngs >= 6 ? '3' : numIngs >= 3 ? '2' : '1';
     } else {
-      computedColumns = numIngs >= 5 ? '2' : '1';
+      computedColumns = numIngs >= 4 ? '2' : '1';
     }
   }
 
@@ -64,23 +64,23 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
   if (recipe.slide2Config?.fontScale && recipe.slide2Config.fontScale !== 1.0) {
     autoFontScale = recipe.slide2Config.fontScale;
   } else if (aspectRatio === '1:1') {
-    if (numSteps >= 6 || totalChars > 500) {
-      autoFontScale = 0.78;
-    } else if (numSteps >= 5 || totalChars > 380) {
-      autoFontScale = 0.84;
-    } else if (numSteps >= 4 || totalChars > 260) {
-      autoFontScale = 0.90;
+    if (numSteps >= 6 || totalChars > 450) {
+      autoFontScale = 0.74;
+    } else if (numSteps >= 5 || totalChars > 320) {
+      autoFontScale = 0.80;
+    } else if (numSteps >= 4 || totalChars > 220) {
+      autoFontScale = 0.86;
     } else {
-      autoFontScale = 0.96;
+      autoFontScale = 0.92;
     }
-  } else if (numSteps >= 6 || totalChars > 600) {
+  } else if (numSteps >= 6 || totalChars > 500) {
+    autoFontScale = 0.74;
+  } else if (numSteps >= 5 || totalChars > 360) {
     autoFontScale = 0.80;
-  } else if (numSteps >= 5 || totalChars > 450) {
+  } else if (numSteps >= 4 || totalChars > 260) {
     autoFontScale = 0.86;
-  } else if (numSteps >= 4 || totalChars > 320) {
-    autoFontScale = 0.92;
   } else {
-    autoFontScale = 1.0;
+    autoFontScale = 0.94;
   }
 
   // Background style based on cardStyle

@@ -53,14 +53,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="message_thread_id"\r\n\r\n${messageThreadId}\r\n`));
     }
 
-    const formattedCaption = caption || `🍳 <b>${escapeHtml(title)}</b>`;
+    const shortAlbumHook = `🍳 <b>${escapeHtml(title)}</b>`;
 
     const mediaList = slides.map((_: any, idx: number) => {
       const attachName = `slide_${idx + 1}`;
       return {
         type: 'photo',
         media: `attach://${attachName}`,
-        caption: idx === 0 ? formattedCaption : undefined,
+        caption: idx === 0 ? shortAlbumHook : undefined,
         parse_mode: 'HTML'
       };
     });
