@@ -18,6 +18,13 @@ function decodeEntities(str: string): string {
     .replace(/&#(\d+);/g, (_, c) => String.fromCharCode(Number(c)));
 }
 
+function escapeHtml(str: string): string {
+  return (str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 function formatIsoDuration(duration: string): string {
   if (!duration) return '10m';
   const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/i);
@@ -390,7 +397,37 @@ async function generateVideoFromSlideBuffers(buf1: Buffer | Uint8Array, buf2: Bu
   }
 }
 
-async function sendTelegramMessage(botToken: string, chatId: number | string, messageThreadId: number | undefined, text: string, parseMode: string = 'HTML') {
+function saveCachedRecipe(id: string, url: string, title?: string) {
+  try {
+    const fs = require('fs');
+    let cache: Record<string, { url: string; title?: string }> = {};
+    if (fs.existsSync('/tmp/slyde_recipe_cache.json')) {
+      cache = JSON.parse(fs.readFileSync('/tmp/slyde_recipe_cache.json', 'utf8'));
+    }
+    cache[id] = { url, title };
+    fs.writeFileSync('/tmp/slyde_recipe_cache.json', JSON.stringify(cache));
+  } catch (e) {}
+}
+
+function getCachedRecipe(id: string): { url: string; title?: string } | null {
+  try {
+    const fs = require('fs');
+    if (fs.existsSync('/tmp/slyde_recipe_cache.json')) {
+      const cache = JSON.parse(fs.readFileSync('/tmp/slyde_recipe_cache.json', 'utf8'));
+      return cache[id] || null;
+    }
+  } catch (e) {}
+  return null;
+}
+
+async function sendTelegramMessage(
+  botToken: string,
+  chatId: number | string,
+  messageThreadId: number | undefined,
+  text: string,
+  parseMode: string = 'HTML',
+  replyMarkup?: any
+) {
   try {
     const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST',
@@ -399,7 +436,8 @@ async function sendTelegramMessage(botToken: string, chatId: number | string, me
         chat_id: chatId,
         ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
         text,
-        parse_mode: parseMode
+        parse_mode: parseMode,
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {})
       })
     });
     const data = await res.json();
@@ -410,6 +448,42 @@ async function sendTelegramMessage(botToken: string, chatId: number | string, me
   } catch (e: any) {
     console.error('sendTelegramMessage network exception:', e.message);
   }
+}
+
+async function answerTelegramCallbackQuery(botToken: string, callbackQueryId: string, text?: string) {
+  try {
+    await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        callback_query_id: callbackQueryId,
+        ...(text ? { text } : {})
+      })
+    });
+  } catch (e) {}
+}
+
+async function editTelegramMessageText(
+  botToken: string,
+  chatId: number | string,
+  messageId: number,
+  text: string,
+  parseMode: string = 'HTML',
+  replyMarkup?: any
+) {
+  try {
+    await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        text,
+        parse_mode: parseMode,
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {})
+      })
+    });
+  } catch (e) {}
 }
 
 async function sendTelegramAlbum(botToken: string, chatId: number | string, messageThreadId: number | undefined, buffers: (Buffer | Uint8Array)[], title: string) {
@@ -513,6 +587,86 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
+  // 1. Handle Interactive Inline Button Clicks (callback_query)
+  if (update.callback_query) {
+    const cb = update.callback_query;
+    const cbId = cb.id;
+    const data: string = cb.data || '';
+    const chatId = cb.message?.chat?.id;
+    const messageId = cb.message?.message_id;
+    const messageThreadId = cb.message?.message_thread_id;
+
+    if (!data.startsWith('slyde:')) {
+      await answerTelegramCallbackQuery(botToken, cbId);
+      return res.status(200).send('OK (ignored callback)');
+    }
+
+    const parts = data.split(':');
+    // Format: slyde:<shortId>:<format>:<ratio>
+    const shortId = parts[1];
+    const format = parts[2]; // 'slides' | 'video' | 'all' | 'caption'
+    const rawRatio = parts[3] || '9-16';
+    const ratio: '9:16' | '1:1' | '4:5' = rawRatio.replace('-', ':') as any;
+
+    const cached = getCachedRecipe(shortId);
+    if (!cached || !cached.url) {
+      await answerTelegramCallbackQuery(botToken, cbId, '⚠️ Link expired. Please paste the recipe URL again.');
+      return res.status(200).send('OK');
+    }
+
+    const ratioLabel = ratio === '1:1' ? '1:1 Square' : (ratio === '4:5' ? '4:5 Portrait' : '9:16 Vertical');
+    const actionLabel = format === 'video' ? '🎬 9.0s Video' : (format === 'slides' ? `📸 3 ${ratioLabel} Slides` : (format === 'caption' ? '📋 Viral Caption' : `⚡ Video + 3 Slides (${ratioLabel})`));
+
+    await answerTelegramCallbackQuery(botToken, cbId, `Generating ${actionLabel}...`);
+
+    if (messageId && chatId) {
+      await editTelegramMessageText(
+        botToken,
+        chatId,
+        messageId,
+        `👨‍🍳 <b>Generating ${actionLabel}...</b>\n\n🍽️ <i>${escapeHtml(cached.title || cached.url)}</i>`
+      );
+    }
+
+    // Process rendering
+    waitUntil((async () => {
+      try {
+        const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'slyde-bay.vercel.app';
+        const recipe = await extractRecipeServer(cached.url);
+        const { caption, hook } = await generateAICaptionServer(recipe);
+        if (hook) {
+          recipe.shortHook = hook.replace(/🍽️/g, '').trim();
+        }
+
+        if (format === 'caption') {
+          await sendTelegramMessage(botToken, chatId, messageThreadId, caption);
+          return;
+        }
+
+        const needsVideo = format === 'video' || format === 'all';
+        const needsSlides = format === 'slides' || format === 'all';
+
+        const media = await captureMediaServerless(recipe, host, needsVideo, ratio);
+
+        if (needsVideo && media.videoBuffer) {
+          await sendTelegramVideo(botToken, chatId, messageThreadId, media.videoBuffer, recipe.title);
+        }
+
+        if (needsSlides && media.slides) {
+          await sendTelegramAlbum(botToken, chatId, messageThreadId, media.slides, recipe.title);
+        }
+
+        // Send full caption
+        await sendTelegramMessage(botToken, chatId, messageThreadId, caption);
+      } catch (err: any) {
+        await sendTelegramMessage(botToken, chatId, messageThreadId, `⚠️ Error rendering ${actionLabel}: ${err.message}`);
+      }
+    })());
+
+    return res.status(200).send('OK');
+  }
+
+  // 2. Handle Text Messages & Commands
   const msg = update.message || update.channel_post || update.edited_message || update.edited_channel_post;
   if (!msg) {
     return res.status(200).send('OK (no message)');
@@ -537,7 +691,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       botToken,
       chatId,
       messageThreadId,
-      `🎬 <b>Welcome to Slyde Automation Bot!</b>\n\nSend me <b>any recipe URL</b> or use commands:\n\n📸 <b>/slides 1:1 &lt;url&gt;</b> — 1:1 Square Carousel (Instagram & Threads)\n📸 <b>/slides 4:5 &lt;url&gt;</b> — 4:5 Portrait Carousel (Instagram Feed)\n📸 <b>/slides 9:16 &lt;url&gt;</b> — 9:16 Vertical Carousel (TikTok & Stories)\n🎥 <b>/video &lt;url&gt;</b> — 9.0s 9:16 Video (YouTube Shorts & Reels)\n⚡ <b>/all &lt;url&gt;</b> (or paste any URL) — Both Video + 3 Slides + Caption\n📋 <b>/caption &lt;url&gt;</b> — Viral Social Caption only\n\n💡 <i>Shortcuts:</i>\n• <code>/slide 1:1 &lt;url&gt;</code> or <code>/square &lt;url&gt;</code>\n• <code>/slide 4:5 &lt;url&gt;</code> or <code>/portrait &lt;url&gt;</code>\n• <code>/slide 9:16 &lt;url&gt;</code> or <code>/slide &lt;url&gt;</code>\n\n🆔 <i>Your Chat ID: <code>${chatId}</code></i>`
+      `🎬 <b>Welcome to Slyde Automation Bot!</b>\n\nSend me <b>any recipe URL</b> to choose options via buttons, or use commands directly:\n\n📸 <b>/slides 1:1 &lt;url&gt;</b> — 1:1 Square Carousel (Instagram & Threads)\n📸 <b>/slides 4:5 &lt;url&gt;</b> — 4:5 Portrait Carousel (Instagram Feed)\n📸 <b>/slides 9:16 &lt;url&gt;</b> — 9:16 Vertical Carousel (TikTok & Stories)\n🎥 <b>/video &lt;url&gt;</b> — 9.0s 9:16 Video (YouTube Shorts & Reels)\n⚡ <b>/all &lt;url&gt;</b> (or paste any URL) — Both Video + 3 Slides + Caption\n📋 <b>/caption &lt;url&gt;</b> — Viral Social Caption only\n\n💡 <i>Shortcuts:</i>\n• <code>/slide 1:1 &lt;url&gt;</code> or <code>/square &lt;url&gt;</code>\n• <code>/slide 4:5 &lt;url&gt;</code> or <code>/portrait &lt;url&gt;</code>\n• <code>/slide 9:16 &lt;url&gt;</code> or <code>/slide &lt;url&gt;</code>\n\n🆔 <i>Your Chat ID: <code>${chatId}</code></i>`
     );
     return res.status(200).send('OK');
   }
@@ -547,6 +701,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const recipeUrl = urlMatch[0];
     const lowerText = text.toLowerCase().trim();
 
+    const isDirectCommand = lowerText.startsWith('/') && (
+      lowerText.startsWith('/slides') || lowerText.startsWith('/slide') ||
+      lowerText.startsWith('/video') || lowerText.startsWith('/short') ||
+      lowerText.startsWith('/reel') || lowerText.startsWith('/v ') ||
+      lowerText.startsWith('/caption') || lowerText.startsWith('/c ') ||
+      lowerText.startsWith('/square') || lowerText.startsWith('/sq') ||
+      lowerText.startsWith('/portrait') || lowerText.startsWith('/all')
+    );
+
+    // If sent as raw URL (or /menu /options), display interactive inline buttons!
+    if (!isDirectCommand) {
+      const shortId = Math.random().toString(36).substring(2, 8);
+      saveCachedRecipe(shortId, recipeUrl);
+
+      // Fetch quick title preview
+      let previewTitle = 'Recipe Link Received';
+      try {
+        const resPreview = await extractRecipeServer(recipeUrl);
+        if (resPreview?.title) {
+          previewTitle = resPreview.title;
+          saveCachedRecipe(shortId, recipeUrl, previewTitle);
+        }
+      } catch (e) {}
+
+      const inlineKeyboard = {
+        inline_keyboard: [
+          [
+            { text: '📸 9:16 Vertical Slides', callback_data: `slyde:${shortId}:slides:9-16` },
+            { text: '📸 1:1 Square Slides', callback_data: `slyde:${shortId}:slides:1-1` }
+          ],
+          [
+            { text: '📸 4:5 Portrait Slides', callback_data: `slyde:${shortId}:slides:4-5` },
+            { text: '🎥 9s Video (9:16)', callback_data: `slyde:${shortId}:video:9-16` }
+          ],
+          [
+            { text: '⚡ Video + Slides + Caption', callback_data: `slyde:${shortId}:all:9-16` },
+            { text: '📋 Caption Only', callback_data: `slyde:${shortId}:caption:none` }
+          ]
+        ]
+      };
+
+      await sendTelegramMessage(
+        botToken,
+        chatId,
+        messageThreadId,
+        `🍳 <b>${escapeHtml(previewTitle)}</b>\n\n👇 <b>Tap a button to choose format & aspect ratio:</b>`,
+        'HTML',
+        inlineKeyboard
+      );
+
+      return res.status(200).send('OK');
+    }
+
+    // Direct command execution
     let requestedAspectRatio: '9:16' | '1:1' | '4:5' = '9:16';
     if (lowerText.includes('1:1') || lowerText.includes('square') || lowerText.startsWith('/sq')) {
       requestedAspectRatio = '1:1';

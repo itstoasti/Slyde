@@ -525,6 +525,104 @@ async function pollUpdates() {
       for (const update of data.result) {
         lastOffset = update.update_id;
 
+        // 1. Handle Inline Button Clicks
+        if (update.callback_query) {
+          const cb = update.callback_query;
+          const cbId = cb.id;
+          const cbData = cb.data || '';
+          const chatId = cb.message?.chat?.id;
+          const messageId = cb.message?.message_id;
+          const messageThreadId = cb.message?.message_thread_id;
+
+          if (cbData.startsWith('slyde:')) {
+            const [, shortId, format, rawRatio] = cbData.split(':');
+            const ratio = (rawRatio || '9-16').replace('-', ':');
+            const cached = getCachedRecipe(shortId);
+
+            if (cached && cached.url) {
+              const ratioLabel = ratio === '1:1' ? '1:1 Square' : (ratio === '4:5' ? '4:5 Portrait' : '9:16 Vertical');
+              const actionLabel = format === 'video' ? '🎬 60 FPS Video' : (format === 'slides' ? `📸 3 ${ratioLabel} Slides` : (format === 'caption' ? '📋 Viral Caption' : `⚡ Video + 3 Slides (${ratioLabel})`));
+
+              // Acknowledge callback query
+              await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ callback_query_id: cbId, text: `Generating ${actionLabel}...` })
+              });
+
+              if (messageId && chatId) {
+                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    chat_id: chatId,
+                    message_id: messageId,
+                    text: `👨‍🍳 <b>Generating ${actionLabel}...</b>\n\n🍽️ <i>${cached.title || cached.url}</i>`,
+                    parse_mode: 'HTML'
+                  })
+                });
+              }
+
+              // Process rendering
+              try {
+                const branding = loadBranding();
+                const recipe = await extractRecipe(cached.url, branding);
+                saveRecipeToQueue(recipe);
+                const caption = await generateSocialCaption(recipe);
+
+                if (format === 'caption') {
+                  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: chatId, ...(messageThreadId ? { message_thread_id: messageThreadId } : {}), text: caption })
+                  });
+                  continue;
+                }
+
+                const [buf1, buf2, buf3] = await captureSlidesWithPuppeteer(recipe, ratio);
+
+                if (format === 'video' || format === 'all') {
+                  const videoBuf = await generateVideoFromSlides(buf1, buf2, buf3);
+                  const videoForm = new FormData();
+                  videoForm.append('chat_id', chatId);
+                  if (messageThreadId) videoForm.append('message_thread_id', String(messageThreadId));
+                  const slug = recipe.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                  videoForm.append('video', new Blob([videoBuf], { type: 'video/mp4' }), `${slug}-shorts.mp4`);
+                  videoForm.append('caption', `🎬 <b>${recipe.title}</b>`);
+                  videoForm.append('parse_mode', 'HTML');
+                  videoForm.append('supports_streaming', 'true');
+                  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVideo`, { method: 'POST', body: videoForm });
+                }
+
+                if (format === 'slides' || format === 'all') {
+                  const albumForm = new FormData();
+                  albumForm.append('chat_id', chatId);
+                  if (messageThreadId) albumForm.append('message_thread_id', String(messageThreadId));
+                  const media = [
+                    { type: 'photo', media: 'attach://slide_1', caption: `🍳 <b>${recipe.title}</b> (${ratioLabel})`, parse_mode: 'HTML' },
+                    { type: 'photo', media: 'attach://slide_2' },
+                    { type: 'photo', media: 'attach://slide_3' }
+                  ];
+                  albumForm.append('media', JSON.stringify(media));
+                  albumForm.append('slide_1', new Blob([buf1], { type: 'image/png' }), 'slide-1.png');
+                  albumForm.append('slide_2', new Blob([buf2], { type: 'image/png' }), 'slide-2.png');
+                  albumForm.append('slide_3', new Blob([buf3], { type: 'image/png' }), 'slide-3.png');
+                  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup`, { method: 'POST', body: albumForm });
+                }
+
+                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ chat_id: chatId, ...(messageThreadId ? { message_thread_id: messageThreadId } : {}), text: caption })
+                });
+              } catch (e) {
+                console.error('Callback process error:', e);
+              }
+            }
+          }
+          continue;
+        }
+
         const msg = update.message || update.channel_post || update.edited_message || update.edited_channel_post;
         if (!msg) continue;
 
@@ -542,7 +640,7 @@ async function pollUpdates() {
             body: JSON.stringify({
               chat_id: chatId,
               ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
-              text: `🎬 <b>Welcome to Slyde Automation Bot!</b>\n\nSend me <b>any recipe URL</b> or use commands:\n\n📸 <b>/slides 1:1 &lt;url&gt;</b> — 1:1 Square Carousel (Instagram & Threads)\n📸 <b>/slides 4:5 &lt;url&gt;</b> — 4:5 Portrait Carousel (Instagram Feed)\n📸 <b>/slides 9:16 &lt;url&gt;</b> — 9:16 Vertical Carousel (TikTok & Stories)\n🎥 <b>/video &lt;url&gt;</b> — 60 FPS 9:16 Video (Ready for YouTube Shorts & TikTok)\n⚡ <b>/all &lt;url&gt;</b> (or paste any URL) — Both Video + 3 Slides + Caption\n📋 <b>/caption &lt;url&gt;</b> — Viral Social Caption only\n\n💡 <i>Shortcuts:</i>\n• <code>/slide 1:1 &lt;url&gt;</code> or <code>/square &lt;url&gt;</code>\n• <code>/slide 4:5 &lt;url&gt;</code> or <code>/portrait &lt;url&gt;</code>\n• <code>/slide 9:16 &lt;url&gt;</code> or <code>/slide &lt;url&gt;</code>\n\n<i>💡 Tip: Tap and save the video directly to your phone camera roll to add trending sounds in the YouTube Shorts or TikTok app!</i>`,
+              text: `🎬 <b>Welcome to Slyde Automation Bot!</b>\n\nSend me <b>any recipe URL</b> to choose format via buttons, or use direct commands:\n\n📸 <b>/slides 1:1 &lt;url&gt;</b> — 1:1 Square Carousel (Instagram & Threads)\n📸 <b>/slides 4:5 &lt;url&gt;</b> — 4:5 Portrait Carousel (Instagram Feed)\n📸 <b>/slides 9:16 &lt;url&gt;</b> — 9:16 Vertical Carousel (TikTok & Stories)\n🎥 <b>/video &lt;url&gt;</b> — 60 FPS 9:16 Video (Ready for YouTube Shorts & TikTok)\n⚡ <b>/all &lt;url&gt;</b> (or paste any URL) — Both Video + 3 Slides + Caption\n📋 <b>/caption &lt;url&gt;</b> — Viral Social Caption only\n\n💡 <i>Shortcuts:</i>\n• <code>/slide 1:1 &lt;url&gt;</code> or <code>/square &lt;url&gt;</code>\n• <code>/slide 4:5 &lt;url&gt;</code> or <code>/portrait &lt;url&gt;</code>\n• <code>/slide 9:16 &lt;url&gt;</code> or <code>/slide &lt;url&gt;</code>\n\n<i>💡 Tip: Tap and save the video directly to your phone camera roll to add trending sounds in the YouTube Shorts or TikTok app!</i>`,
               parse_mode: 'HTML'
             })
           });
@@ -553,6 +651,60 @@ async function pollUpdates() {
         if (urlMatch) {
           const recipeUrl = urlMatch[0];
           const lowerText = text.toLowerCase().trim();
+
+          const isDirectCommand = lowerText.startsWith('/') && (
+            lowerText.startsWith('/slides') || lowerText.startsWith('/slide') ||
+            lowerText.startsWith('/video') || lowerText.startsWith('/short') ||
+            lowerText.startsWith('/reel') || lowerText.startsWith('/v ') ||
+            lowerText.startsWith('/caption') || lowerText.startsWith('/c ') ||
+            lowerText.startsWith('/square') || lowerText.startsWith('/sq') ||
+            lowerText.startsWith('/portrait') || lowerText.startsWith('/all')
+          );
+
+          if (!isDirectCommand) {
+            const shortId = Math.random().toString(36).substring(2, 8);
+            saveCachedRecipe(shortId, recipeUrl);
+
+            let previewTitle = 'Recipe Link Received';
+            try {
+              const branding = loadBranding();
+              const p = await extractRecipe(recipeUrl, branding);
+              if (p?.title) {
+                previewTitle = p.title;
+                saveCachedRecipe(shortId, recipeUrl, previewTitle);
+              }
+            } catch (e) {}
+
+            const inlineKeyboard = {
+              inline_keyboard: [
+                [
+                  { text: '📸 9:16 Vertical Slides', callback_data: `slyde:${shortId}:slides:9-16` },
+                  { text: '📸 1:1 Square Slides', callback_data: `slyde:${shortId}:slides:1-1` }
+                ],
+                [
+                  { text: '📸 4:5 Portrait Slides', callback_data: `slyde:${shortId}:slides:4-5` },
+                  { text: '🎥 9s Video (9:16)', callback_data: `slyde:${shortId}:video:9-16` }
+                ],
+                [
+                  { text: '⚡ Video + Slides + Caption', callback_data: `slyde:${shortId}:all:9-16` },
+                  { text: '📋 Caption Only', callback_data: `slyde:${shortId}:caption:none` }
+                ]
+              ]
+            };
+
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: chatId,
+                ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
+                text: `🍳 <b>${previewTitle}</b>\n\n👇 <b>Tap a button to choose format & aspect ratio:</b>`,
+                parse_mode: 'HTML',
+                reply_markup: inlineKeyboard
+              })
+            });
+            continue;
+          }
 
           let requestedAspectRatio = '9:16';
           if (lowerText.includes('1:1') || lowerText.includes('square') || lowerText.startsWith('/sq')) {
