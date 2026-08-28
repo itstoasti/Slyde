@@ -508,6 +508,28 @@ async function generateVideoFromSlides(buf1, buf2, buf3) {
   }
 }
 
+function extractUrlFromCallbackMessage(cb) {
+  if (!cb || !cb.message) return null;
+
+  if (Array.isArray(cb.message.entities)) {
+    for (const ent of cb.message.entities) {
+      if (ent.type === 'text_link' && ent.url) {
+        return ent.url;
+      }
+      if (ent.type === 'url' && cb.message.text) {
+        const extracted = cb.message.text.substring(ent.offset, ent.offset + ent.length);
+        if (extracted.startsWith('http')) return extracted;
+      }
+    }
+  }
+
+  const fullText = (cb.message.text || cb.message.caption || '');
+  const match = fullText.match(/https?:\/\/[^\s>"]+/i);
+  if (match) return match[0];
+
+  return null;
+}
+
 let lastOffset = 0;
 
 async function pollUpdates() {
@@ -537,9 +559,19 @@ async function pollUpdates() {
           if (cbData.startsWith('slyde:')) {
             const [, shortId, format, rawRatio] = cbData.split(':');
             const ratio = (rawRatio || '9-16').replace('-', ':');
-            const cached = getCachedRecipe(shortId);
 
-            if (cached && cached.url) {
+            let targetUrl = extractUrlFromCallbackMessage(cb);
+            let targetTitle = '';
+
+            if (!targetUrl && shortId) {
+              const cached = getCachedRecipe(shortId);
+              if (cached) {
+                targetUrl = cached.url;
+                targetTitle = cached.title || '';
+              }
+            }
+
+            if (targetUrl) {
               const ratioLabel = ratio === '1:1' ? '1:1 Square' : (ratio === '4:5' ? '4:5 Portrait' : '9:16 Vertical');
               const actionLabel = format === 'video' ? '🎬 60 FPS Video' : (format === 'slides' ? `📸 3 ${ratioLabel} Slides` : (format === 'caption' ? '📋 Viral Caption' : `⚡ Video + 3 Slides (${ratioLabel})`));
 
@@ -557,7 +589,7 @@ async function pollUpdates() {
                   body: JSON.stringify({
                     chat_id: chatId,
                     message_id: messageId,
-                    text: `👨‍🍳 <b>Generating ${actionLabel}...</b>\n\n🍽️ <i>${cached.title || cached.url}</i>`,
+                    text: `👨‍🍳 <b>Generating ${actionLabel}...</b>\n\n🍽️ <i>${targetTitle || targetUrl}</i>`,
                     parse_mode: 'HTML'
                   })
                 });
@@ -566,7 +598,7 @@ async function pollUpdates() {
               // Process rendering
               try {
                 const branding = loadBranding();
-                const recipe = await extractRecipe(cached.url, branding);
+                const recipe = await extractRecipe(targetUrl, branding);
                 saveRecipeToQueue(recipe);
                 const caption = await generateSocialCaption(recipe);
 
@@ -698,7 +730,7 @@ async function pollUpdates() {
               body: JSON.stringify({
                 chat_id: chatId,
                 ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
-                text: `🍳 <b>${previewTitle}</b>\n\n👇 <b>Tap a button to choose format & aspect ratio:</b>`,
+                text: `🍳 <b>${previewTitle}</b>\n🔗 <a href="${recipeUrl}">Source Recipe</a>\n\n👇 <b>Tap a button to choose format & aspect ratio:</b>`,
                 parse_mode: 'HTML',
                 reply_markup: inlineKeyboard
               })

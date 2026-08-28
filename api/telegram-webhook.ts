@@ -556,6 +556,28 @@ async function sendTelegramVideo(botToken: string, chatId: number | string, mess
   return await res.json();
 }
 
+function extractUrlFromCallbackMessage(cb: any): string | null {
+  if (!cb || !cb.message) return null;
+
+  if (Array.isArray(cb.message.entities)) {
+    for (const ent of cb.message.entities) {
+      if (ent.type === 'text_link' && ent.url) {
+        return ent.url;
+      }
+      if (ent.type === 'url' && cb.message.text) {
+        const extracted = cb.message.text.substring(ent.offset, ent.offset + ent.length);
+        if (extracted.startsWith('http')) return extracted;
+      }
+    }
+  }
+
+  const fullText = (cb.message.text || cb.message.caption || '');
+  const match = fullText.match(/https?:\/\/[^\s>"]+/i);
+  if (match) return match[0];
+
+  return null;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(200).send('Slyde Telegram Webhook Endpoint');
@@ -608,9 +630,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const rawRatio = parts[3] || '9-16';
     const ratio: '9:16' | '1:1' | '4:5' = rawRatio.replace('-', ':') as any;
 
-    const cached = getCachedRecipe(shortId);
-    if (!cached || !cached.url) {
-      await answerTelegramCallbackQuery(botToken, cbId, '⚠️ Link expired. Please paste the recipe URL again.');
+    let targetUrl = extractUrlFromCallbackMessage(cb);
+    let targetTitle = '';
+
+    if (!targetUrl && shortId) {
+      const cached = getCachedRecipe(shortId);
+      if (cached) {
+        targetUrl = cached.url;
+        targetTitle = cached.title || '';
+      }
+    }
+
+    if (!targetUrl) {
+      await answerTelegramCallbackQuery(botToken, cbId, '⚠️ Link not found. Please paste the recipe URL again.');
       return res.status(200).send('OK');
     }
 
@@ -624,7 +656,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         botToken,
         chatId,
         messageId,
-        `👨‍🍳 <b>Generating ${actionLabel}...</b>\n\n🍽️ <i>${escapeHtml(cached.title || cached.url)}</i>`
+        `👨‍🍳 <b>Generating ${actionLabel}...</b>\n\n🍽️ <i>${escapeHtml(targetTitle || targetUrl)}</i>`
       );
     }
 
@@ -632,7 +664,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     waitUntil((async () => {
       try {
         const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'slyde-bay.vercel.app';
-        const recipe = await extractRecipeServer(cached.url);
+        const recipe = await extractRecipeServer(targetUrl);
         const { caption, hook } = await generateAICaptionServer(recipe);
         if (hook) {
           recipe.shortHook = hook.replace(/🍽️/g, '').trim();
@@ -746,7 +778,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         botToken,
         chatId,
         messageThreadId,
-        `🍳 <b>${escapeHtml(previewTitle)}</b>\n\n👇 <b>Tap a button to choose format & aspect ratio:</b>`,
+        `🍳 <b>${escapeHtml(previewTitle)}</b>\n🔗 <a href="${recipeUrl}">Source Recipe</a>\n\n👇 <b>Tap a button to choose format & aspect ratio:</b>`,
         'HTML',
         inlineKeyboard
       );
