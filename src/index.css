@@ -1282,6 +1282,15 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   flex-shrink: 0;
 }
 
+.brand-pill-logo {
+  width: 14px;
+  height: 14px;
+  border-radius: 3.5px;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
 .hero-simple-badge {
   background: rgba(14, 10, 6, 0.90);
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -2523,6 +2532,12 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 .slide-1.aspect-1-1 .hero-simple-badge {
   font-size: 0.56rem;
   padding: 3px 8px;
+}
+
+.slide-1.aspect-1-1 .brand-pill-logo {
+  width: 11px;
+  height: 11px;
+  border-radius: 2.5px;
 }
 
 .slide-1.aspect-1-1 .slide-hero-safe-content {

@@ -38,6 +38,7 @@ export const Slide1Hero: React.FC<Slide1HeroProps> = ({ recipe, theme, aspectRat
   // Top right stat badge (e.g. 10 MIN · 4 SERVINGS)
   const cleanRightBadge = recipe.highlightBadge || `${recipe.cookTime || recipe.prepTime} · ${recipe.servings} SERVINGS`;
   const proxiedImage = getProxiedImageUrl(recipe.heroImage);
+  const logoUrl = recipe.brandLogo ? getProxiedImageUrl(recipe.brandLogo) : null;
 
   return (
     <div
@@ -63,7 +64,11 @@ export const Slide1Hero: React.FC<Slide1HeroProps> = ({ recipe, theme, aspectRat
       {/* Top Header Bar */}
       <div className="slide-top-bar">
         <div className="brand-pill-badge">
-          <span className="brand-pill-dot"></span>
+          {logoUrl ? (
+            <img src={logoUrl} alt={recipe.brandName} className="brand-pill-logo" crossOrigin="anonymous" />
+          ) : (
+            <span className="brand-pill-dot"></span>
+          )}
           <span>{cleanTagline}</span>
         </div>
 

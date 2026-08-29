@@ -157,6 +157,8 @@ async function extractRecipeServer(recipeUrl: string) {
     highlightBadge: `${(cookTime || prepTime).toUpperCase()} · ${servings} SERVINGS`,
     taglineBadge: `• ${brandName.toUpperCase()} · SKIP THE LIFE STORY`,
     brandPillBadge: 'AD-FREE · NO BLOG RANTS · JUST RECIPES',
+    brandLogo: process.env.BRAND_LOGO || '/snaprecipes-app-icon.png',
+    brandLogoSize: Number(process.env.BRAND_LOGO_SIZE) || 58,
     ctaButtonText: 'Get the app — free',
     ctaUrl,
     socialHandle: '@' + brandName.toLowerCase().replace(/\s+/g, ''),
