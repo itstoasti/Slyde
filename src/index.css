@@ -2698,6 +2698,73 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   font-size: 0.48rem;
 }
 
+/* Split Horizontal (Side-by-Side) for 1:1 Square with Heavy Ingredients */
+.slide-2.aspect-1-1 .recipe-main-card.layout-split-horizontal {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  align-items: stretch;
+  padding: 4px 6px;
+}
+
+.slide-2.aspect-1-1 .layout-split-horizontal .ingredients-section {
+  flex: 0 0 38%;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.slide-2.aspect-1-1 .layout-split-horizontal .ingredients-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5px;
+  margin-bottom: 0;
+  overflow: hidden;
+}
+
+.slide-2.aspect-1-1 .layout-split-horizontal .ingredient-pill {
+  padding: 1px 3px;
+  min-height: 11px;
+  border-radius: 2.5px;
+  gap: 2px;
+}
+
+.slide-2.aspect-1-1 .layout-split-horizontal .ing-text {
+  font-size: calc(0.48rem * var(--font-scale, 1));
+  line-height: 1.0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slide-2.aspect-1-1 .layout-split-horizontal .method-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.slide-2.aspect-1-1 .layout-split-horizontal .method-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.slide-2.aspect-1-1 .layout-split-horizontal .method-step-item {
+  padding: 2.5px 4.5px;
+  gap: 3.5px;
+  border-radius: 3.5px;
+}
+
+.slide-2.aspect-1-1 .layout-split-horizontal .step-text,
+.slide-2.aspect-1-1 .layout-split-horizontal .step-instruction-text {
+  font-size: calc(0.60rem * var(--font-scale, 1));
+  font-weight: 600;
+  line-height: 1.18;
+  color: #111827;
+}
+
 /* Slide 3 in 1:1 (Square Brand CTA) */
 .slide-3.aspect-1-1 {
   padding: 12px 10px 6px 10px;

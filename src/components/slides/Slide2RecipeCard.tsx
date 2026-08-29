@@ -170,6 +170,8 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
     autoFontScale = 1.0;
   }
 
+  const isSplitHorizontal = aspectRatio === '1:1' && numIngs >= 9;
+
   // Background style based on cardStyle
   let cardBg = theme.bgCard;
   let textDark = theme.textDark;
@@ -216,7 +218,7 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
       </div>
 
       {/* Main Container Card inside Safe Area */}
-      <div className={`recipe-main-card card-style-${config.cardStyle} ${isHeavyContent ? 'card-heavy-content' : 'card-balanced-content'}`}>
+      <div className={`recipe-main-card card-style-${config.cardStyle} ${isHeavyContent ? 'card-heavy-content' : 'card-balanced-content'} ${isSplitHorizontal ? 'layout-split-horizontal' : ''}`}>
         {/* Ingredients Section */}
         <div className="recipe-section ingredients-section">
           <h3 className="section-title">
