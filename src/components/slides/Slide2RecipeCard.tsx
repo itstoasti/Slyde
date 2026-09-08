@@ -39,6 +39,11 @@ function simplifyStepForSlide(step: string, isCompactMode: boolean): string {
       .replace(/Maldon salt, and a sprinkle of fresh chives/gi, 'flaky salt & chives')
       .replace(/completely smooth/gi, 'smooth')
       .replace(/room temperature/gi, 'room temp')
+      .replace(/Cover and set in the fridge/gi, 'Cover & chill in fridge')
+      .replace(/set in the fridge/gi, 'chill in fridge')
+      .replace(/pressing them down as far as they can go in the mixture/gi, 'press down into mixture')
+      .replace(/Use an immersion blend to blend right in the container until smooth, or blend the entire thing in a small blender/gi, 'Blend in container until smooth (or use a small blender)')
+      .replace(/,\s*(?:then|and)?\s*enjoy!?$/i, '.')
       .trim();
 
     if (clean.length > 130) {
@@ -84,6 +89,7 @@ function simplifyStepForSlide(step: string, isCompactMode: boolean): string {
 function cleanIngredientForSlide(name: string): string {
   if (!name) return '';
   return name.trim()
+    .replace(/\s*\([^)]*\)/g, '') // Strip ALL blog parentheticals like (but remove some...) or (to taste)
     .replace(/such as .*?(?=(,|$|\.))/gi, '')
     .replace(/,\s*such as.*/gi, '')
     .replace(/,\s*divided/gi, '')
@@ -91,6 +97,7 @@ function cleanIngredientForSlide(name: string): string {
     .replace(/,\s*or to taste/gi, '')
     .replace(/,\s*plus more for serving/gi, '')
     .replace(/,\s*melted/gi, '')
+    .replace(/,\s*softened/gi, '')
     .replace(/freshly ground\s*/gi, '')
     .replace(/fresh cracked\s*/gi, '')
     .replace(/finely ground\s*/gi, '')
@@ -101,12 +108,12 @@ function cleanIngredientForSlide(name: string): string {
     .replace(/tablespoons?\b/gi, 'tbsp')
     .replace(/teaspoons?\b/gi, 'tsp')
     .replace(/kernels\b/gi, '')
-    .replace(/Maldon salt and fresh cracked black pepper/gi, 'Salt & black pepper')
+    .replace(/Maldon salt and fresh cracked black pepper/gi, 'Salt & pepper')
     .replace(/Maldon salt and/gi, 'Salt &')
     .replace(/Dash of\s*/gi, '')
-    .replace(/\(just for dusting\)/gi, '(optional)')
-    .replace(/\(for dusting\)/gi, '(dusting)')
-    .replace(/\(room temperature\)/gi, '(room temp)')
+    .replace(/instant espresso powder/gi, 'espresso powder')
+    .replace(/pure vanilla extract/gi, 'vanilla')
+    .replace(/vanilla extract/gi, 'vanilla')
     .replace(/,\s*$/g, '')
     .replace(/\s+/g, ' ')
     .trim();
@@ -122,6 +129,9 @@ function parseIngredient(rawName: string, rawAmount?: string): ParsedIngredient 
   let name = (rawName || '').trim();
   let amount = (rawAmount || '').trim();
 
+  // Strip parentheticals FIRST so amount regexes aren't confused
+  name = name.replace(/\s*\([^)]*\)/g, '').trim();
+
   if (!amount && name) {
     // 1 16-ounce container cottage cheese -> amount: 16 oz, name: cottage cheese
     const containerMatch = name.match(/^(\d+\s+)?(\d+[\s-]ounce|\d+[\s-]oz)\s+(?:container|tub|pack|can|package|block|jar)\s+(?:of\s+)?(.*)/i);
@@ -129,7 +139,7 @@ function parseIngredient(rawName: string, rawAmount?: string): ParsedIngredient 
       amount = containerMatch[2].replace(/[\s-]ounce/i, ' oz').replace(/[\s-]oz/i, ' oz');
       name = containerMatch[3];
     } else {
-      // Numbers with units: e.g. "1/3 cup sugar", "1 tsp vanilla"
+      // Numbers with units: e.g. "1-2 tbsp maple syrup", "1/3 cup sugar", "1 tsp vanilla"
       const unitMatch = name.match(/^([\d/.-]+(?:\s*-\s*[\d/.-]+)?(?:\s+[\d/.-]+)?)\s*(cups?|tablespoons?|tbsp|teaspoons?|tsp|pounds?|lbs?|ounces?|oz|grams?|g|kg|ml|liters?|pinches|pinch|cloves?|slices?|cans?|stalks?|sprigs?|bunch(?:es)?|packages?|pkgs?|medium|large|small)?\b(?:\s+(?:of\s+)?)(.*)/i);
       if (unitMatch) {
         const qty = unitMatch[1].trim();
@@ -298,10 +308,10 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
               return (
                 <div key={idx} className="ingredient-pill">
                   <span className="ing-dot"></span>
-                  <span className="ing-text">
-                    {parsed.amount && <span className="ing-amount-badge">{parsed.amount}</span>}
+                  <div className="ing-content">
+                    {parsed.amount && <span className="ing-amount">{parsed.amount}</span>}
                     <span className="ing-name">{parsed.name}</span>
-                  </span>
+                  </div>
                 </div>
               );
             })}
