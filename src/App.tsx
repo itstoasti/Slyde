@@ -9,6 +9,7 @@ import { PhoneSimulator } from './components/PhoneSimulator';
 import { StoryboardView } from './components/StoryboardView';
 import { SettingsModal } from './components/SettingsModal';
 import { ExportModal } from './components/ExportModal';
+import { BulkScheduleModal } from './components/BulkScheduleModal';
 import { startTelegramListener, stopTelegramListener } from './utils/telegramListener';
 import confetti from 'canvas-confetti';
 
@@ -98,6 +99,7 @@ export const App: React.FC = () => {
   // Modal States
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isBulkScheduleOpen, setIsBulkScheduleOpen] = useState(false);
   const [globalToast, setGlobalToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // References for capturing slides
@@ -400,6 +402,7 @@ const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
       <Header
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenExport={() => setIsExportOpen(true)}
+        onOpenBulkSchedule={() => setIsBulkScheduleOpen(true)}
         viewMode={viewMode}
         onChangeViewMode={setViewMode}
         onRandomizeTheme={handleRandomizeTheme}
@@ -501,6 +504,17 @@ const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
         telegramConfig={telegramConfig}
         onOpenSettings={(tab) => {
           setIsExportOpen(false);
+          setSettingsInitialTab(tab || 'buffer');
+          setIsSettingsOpen(true);
+        }}
+      />
+
+      {/* Bulk Recipe Auto-Scheduler Modal */}
+      <BulkScheduleModal
+        isOpen={isBulkScheduleOpen}
+        onClose={() => setIsBulkScheduleOpen(false)}
+        onOpenSettings={(tab) => {
+          setIsBulkScheduleOpen(false);
           setSettingsInitialTab(tab || 'buffer');
           setIsSettingsOpen(true);
         }}

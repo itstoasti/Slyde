@@ -8,12 +8,14 @@ import {
   LayoutGrid, 
   Shuffle,
   PanelLeftClose,
-  PanelLeft
+  PanelLeft,
+  Calendar
 } from 'lucide-react';
 
 interface HeaderProps {
   onOpenSettings: () => void;
   onOpenExport: () => void;
+  onOpenBulkSchedule: () => void;
   viewMode: StudioViewMode;
   onChangeViewMode: (mode: StudioViewMode) => void;
   onRandomizeTheme: () => void;
@@ -25,6 +27,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onOpenExport,
+  onOpenBulkSchedule,
   viewMode,
   onChangeViewMode,
   onRandomizeTheme,
@@ -96,8 +99,25 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
       </div>
 
-      {/* Right: Export & Settings */}
+      {/* Right: Bulk Schedule, Export & Settings */}
       <div className="header-actions">
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={onOpenBulkSchedule}
+          title="Schedule Recipe Links Daily across TikTok & Instagram"
+          style={{
+            background: 'rgba(245, 158, 11, 0.12)',
+            border: '1px solid var(--app-primary)',
+            color: 'var(--app-primary)',
+            fontWeight: 700,
+            gap: 6
+          }}
+        >
+          <Calendar size={15} />
+          <span>Bulk Schedule</span>
+        </button>
+
         <button
           type="button"
           className="btn-primary"

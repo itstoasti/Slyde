@@ -31,4 +31,11 @@ bot.log
 # Secrets and config
 .env
 .env.*
+*.env
 telegram_config.json
+buffer_config.json
+gemini_config.json
+ai_config.json
+scheduled_posts.json
+batch_urls.txt
+

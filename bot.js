@@ -11,6 +11,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import puppeteer from 'puppeteer-core';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import { selectAudioTrack, getAvailableAudioTracks } from './server/audioManager.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -373,9 +374,9 @@ async function captureSlidesWithPuppeteer(recipe, aspectRatio = '9:16') {
 }
 
 /**
- * Generate 60 FPS 9:16 Vertical Video from the 3 High-Res Slide Buffers
+ * Generate 60 FPS 9:16 Vertical Video from the 3 High-Res Slide Buffers with Background Music
  */
-async function generateVideoFromSlides(buf1, buf2, buf3) {
+async function generateVideoFromSlides(buf1, buf2, buf3, audioTrackPath = null) {
   const browser = await puppeteer.launch({
     executablePath: CHROME_PATH,
     headless: true,
@@ -480,16 +481,38 @@ async function generateVideoFromSlides(buf1, buf2, buf3) {
     try {
       fs.writeFileSync(tmpIn, rawWebm);
       const ffmpegPath = ffmpegInstaller?.path || 'ffmpeg';
-      await execFileAsync(ffmpegPath, [
-        '-y',
-        '-i', tmpIn,
-        '-c:v', 'libx264',
-        '-pix_fmt', 'yuv420p',
-        '-profile:v', 'main',
-        '-preset', 'ultrafast',
-        '-movflags', '+faststart',
-        tmpOut
-      ]);
+
+      const resolvedAudio = audioTrackPath || selectAudioTrack('', 'auto');
+      const ffmpegArgs = ['-y', '-i', tmpIn];
+
+      if (resolvedAudio && fs.existsSync(resolvedAudio)) {
+        console.log('\x1b[36m%s\x1b[0m', `🎵 [FFmpeg] Muxing soundtrack: ${path.basename(resolvedAudio)}`);
+        ffmpegArgs.push(
+          '-stream_loop', '-1',
+          '-i', resolvedAudio,
+          '-c:v', 'libx264',
+          '-pix_fmt', 'yuv420p',
+          '-profile:v', 'main',
+          '-preset', 'ultrafast',
+          '-c:a', 'aac',
+          '-b:a', '192k',
+          '-af', 'afade=t=in:ss=0:d=0.3,afade=t=out:st=8.4:d=0.6',
+          '-shortest',
+          '-movflags', '+faststart',
+          tmpOut
+        );
+      } else {
+        ffmpegArgs.push(
+          '-c:v', 'libx264',
+          '-pix_fmt', 'yuv420p',
+          '-profile:v', 'main',
+          '-preset', 'ultrafast',
+          '-movflags', '+faststart',
+          tmpOut
+        );
+      }
+
+      await execFileAsync(ffmpegPath, ffmpegArgs);
 
       if (fs.existsSync(tmpOut)) {
         const mp4Buf = fs.readFileSync(tmpOut);
@@ -531,12 +554,24 @@ function extractUrlFromCallbackMessage(cb) {
 }
 
 let lastOffset = 0;
+let webhookResetDone = false;
 
 async function pollUpdates() {
   const { token: BOT_TOKEN } = loadTelegramConfig();
   if (!BOT_TOKEN) {
     setTimeout(pollUpdates, 4000);
     return;
+  }
+
+  // Security: Detach any external webhooks that hijackers might have set, and purge pending spam queue
+  if (!webhookResetDone) {
+    webhookResetDone = true;
+    try {
+      console.log('\x1b[33m%s\x1b[0m', '🔒 [Slyde Security] Resetting any external webhooks & purging pending spam queue...');
+      const resetRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook?drop_pending_updates=true`);
+      const resetJson = await resetRes.json();
+      console.log('\x1b[32m%s\x1b[0m', `🔒 [Slyde Security] Webhook reset: ${resetJson.description || (resetJson.ok ? 'Clean' : 'Failed')}`);
+    } catch (e) {}
   }
 
   try {
@@ -614,13 +649,13 @@ async function pollUpdates() {
                 const [buf1, buf2, buf3] = await captureSlidesWithPuppeteer(recipe, ratio);
 
                 if (format === 'video' || format === 'all') {
-                  const videoBuf = await generateVideoFromSlides(buf1, buf2, buf3);
+                  const videoBuf = await generateVideoFromSlides(buf1, buf2, buf3, selectAudioTrack(recipe.title, 'auto'));
                   const videoForm = new FormData();
                   videoForm.append('chat_id', chatId);
                   if (messageThreadId) videoForm.append('message_thread_id', String(messageThreadId));
                   const slug = recipe.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
                   videoForm.append('video', new Blob([videoBuf], { type: 'video/mp4' }), `${slug}-shorts.mp4`);
-                  videoForm.append('caption', `🎬 <b>${recipe.title}</b>`);
+                  videoForm.append('caption', `🎬 <b>${recipe.title}</b> <i>(with High-Vibe Audio)</i>`);
                   videoForm.append('parse_mode', 'HTML');
                   videoForm.append('supports_streaming', 'true');
                   await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVideo`, { method: 'POST', body: videoForm });
@@ -663,6 +698,22 @@ async function pollUpdates() {
         const messageThreadId = msg.message_thread_id;
         if (!chatId || !text) continue;
 
+        // Security Guard: Ignore any updates from unauthorized chats or random users
+        const senderId = String(msg.from?.id || '');
+        const chatStr = String(chatId);
+        const { chatId: configuredChatId } = loadTelegramConfig();
+        const allowedChat = String(configuredChatId || '').trim();
+
+        const isAuthorized = 
+          senderId === '1294588369' || 
+          chatStr === '1294588369' || 
+          (allowedChat && (chatStr === allowedChat || chatStr === allowedChat.replace('@', '')));
+
+        if (!isAuthorized) {
+          console.warn(`🛡️ [Slyde Security] Ignored message from unauthorized chat ${chatStr} (sender: ${senderId || 'unknown'})`);
+          continue;
+        }
+
         const user = msg.from?.username || msg.from?.first_name || msg.chat?.title || 'User';
 
         if (text.startsWith('/start') || text.startsWith('/help')) {
@@ -672,11 +723,39 @@ async function pollUpdates() {
             body: JSON.stringify({
               chat_id: chatId,
               ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
-              text: `🎬 <b>Welcome to Slyde Automation Bot!</b>\n\nSend me <b>any recipe URL</b> to choose format via buttons, or use direct commands:\n\n📸 <b>/slides 1:1 &lt;url&gt;</b> — 1:1 Square Carousel (Instagram & Threads)\n📸 <b>/slides 4:5 &lt;url&gt;</b> — 4:5 Portrait Carousel (Instagram Feed)\n📸 <b>/slides 9:16 &lt;url&gt;</b> — 9:16 Vertical Carousel (TikTok & Stories)\n🎥 <b>/video &lt;url&gt;</b> — 60 FPS 9:16 Video (Ready for YouTube Shorts & TikTok)\n⚡ <b>/all &lt;url&gt;</b> (or paste any URL) — Both Video + 3 Slides + Caption\n📋 <b>/caption &lt;url&gt;</b> — Viral Social Caption only\n\n💡 <i>Shortcuts:</i>\n• <code>/slide 1:1 &lt;url&gt;</code> or <code>/square &lt;url&gt;</code>\n• <code>/slide 4:5 &lt;url&gt;</code> or <code>/portrait &lt;url&gt;</code>\n• <code>/slide 9:16 &lt;url&gt;</code> or <code>/slide &lt;url&gt;</code>\n\n<i>💡 Tip: Tap and save the video directly to your phone camera roll to add trending sounds in the YouTube Shorts or TikTok app!</i>`,
+              text: `🎬 <b>Welcome to Slyde Automation Bot!</b>\n\nSend me <b>any recipe URL</b> to choose format via buttons, or use direct commands:\n\n📸 <b>/slides 1:1 &lt;url&gt;</b> — 1:1 Square Carousel (Instagram & Threads)\n📸 <b>/slides 4:5 &lt;url&gt;</b> — 4:5 Portrait Carousel (Instagram Feed)\n📸 <b>/slides 9:16 &lt;url&gt;</b> — 9:16 Vertical Carousel (TikTok & Stories)\n🎥 <b>/video &lt;url&gt;</b> — 60 FPS 9:16 Video (with Background Music)\n⚡ <b>/all &lt;url&gt;</b> (or paste any URL) — Both Video + 3 Slides + Caption\n📅 <b>/schedule &lt;url1&gt; &lt;url2&gt;...</b> — Bulk schedule daily posts across TikTok & Instagram\n📋 <b>/caption &lt;url&gt;</b> — Viral Social Caption only\n\n💡 <i>Shortcuts:</i>\n• <code>/slide 1:1 &lt;url&gt;</code> or <code>/square &lt;url&gt;</code>\n• <code>/slide 4:5 &lt;url&gt;</code> or <code>/portrait &lt;url&gt;</code>\n• <code>/slide 9:16 &lt;url&gt;</code> or <code>/slide &lt;url&gt;</code>\n\n<i>🎵 All generated videos now feature high-vibe, royalty-free audio tracks automatically embedded!</i>`,
               parse_mode: 'HTML'
             })
           });
           continue;
+        }
+
+        if (text.startsWith('/batch') || text.startsWith('/schedule')) {
+          const matchedUrls = text.match(/https?:\/\/[^\s]+/gi) || [];
+          if (matchedUrls.length > 0) {
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: chatId,
+                ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
+                text: `🚀 <b>Received ${matchedUrls.length} recipe URLs for daily scheduling!</b>\n\nStarting automated background pipeline: extracting recipes, writing viral captions, rendering 60 FPS videos with high-vibe soundtrack, and scheduling 1 post per day across your Buffer accounts (TikTok, Instagram & Threads)...`,
+                parse_mode: 'HTML'
+              })
+            });
+
+            import('./server/batchScheduler.js').then(({ scheduleBatch }) => {
+              scheduleBatch({
+                urls: matchedUrls,
+                cadence: '1-daily',
+                preferredTime: '11:30',
+                musicVibe: 'auto'
+              }).catch(err => {
+                console.error('Batch schedule error in bot:', err);
+              });
+            });
+            continue;
+          }
         }
 
         const urlMatch = text.match(/https?:\/\/[^\s]+/i);
@@ -794,8 +873,8 @@ async function pollUpdates() {
 
             // If video requested or full mode (/all or raw link), render 60 FPS video
             if (isVideoOnly || !isSlidesOnly) {
-              console.log('\x1b[36m%s\x1b[0m', `🎬 [Slyde Bot] Rendering 60 FPS HD 9:16 video for "${recipe.title}"...`);
-              const videoBuf = await generateVideoFromSlides(buf1, buf2, buf3);
+              console.log('\x1b[36m%s\x1b[0m', `🎬 [Slyde Bot] Rendering 60 FPS HD 9:16 video for "${recipe.title}" with background music...`);
+              const videoBuf = await generateVideoFromSlides(buf1, buf2, buf3, selectAudioTrack(recipe.title, 'auto'));
 
               const videoForm = new FormData();
               videoForm.append('chat_id', chatId);
@@ -804,7 +883,7 @@ async function pollUpdates() {
               }
               const slug = recipe.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
               videoForm.append('video', new Blob([videoBuf], { type: 'video/mp4' }), `${slug}-shorts.mp4`);
-              videoForm.append('caption', `🎬 <b>${recipe.title}</b>\n\n<i>✨ 60 FPS 9:16 Shorts/TikTok video ready! Save to camera roll & add trending audio.</i>`);
+              videoForm.append('caption', `🎬 <b>${recipe.title}</b>\n\n<i>✨ 60 FPS 9:16 Shorts/TikTok video ready with high-vibe soundtrack!</i>`);
               videoForm.append('parse_mode', 'HTML');
               videoForm.append('supports_streaming', 'true');
               videoForm.append('width', '1080');
@@ -877,5 +956,11 @@ async function pollUpdates() {
 }
 
 console.log('\x1b[36m%s\x1b[0m', '🤖 [Slyde 24/7 Bot] Initializing Telegram Automation Service...');
+try {
+  const availableTracks = getAvailableAudioTracks();
+  console.log('\x1b[35m%s\x1b[0m', `🎵 [Audio Engine] ${availableTracks.length} background soundtrack(s) loaded & ready in music/ folder.`);
+} catch (e) {
+  console.warn('Could not initialize audio tracks:', e.message);
+}
 console.log('\x1b[32m%s\x1b[0m', '🟢 [Slyde 24/7 Bot] Active and listening for incoming recipe URLs...');
 pollUpdates();

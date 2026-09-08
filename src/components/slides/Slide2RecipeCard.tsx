@@ -37,15 +37,17 @@ function simplifyStepForSlide(step: string, isCompactMode: boolean): string {
       .replace(/Finish with one last drizzle of/gi, 'Top with')
       .replace(/Serve the warm corn fritters with a generous bowl of/gi, 'Serve warm fritters with')
       .replace(/Maldon salt, and a sprinkle of fresh chives/gi, 'flaky salt & chives')
+      .replace(/completely smooth/gi, 'smooth')
+      .replace(/room temperature/gi, 'room temp')
       .trim();
 
-    if (clean.length > 120) {
+    if (clean.length > 130) {
       const sentences = clean.split(/(?<=[.!?])\s+/);
       let accum = '';
       for (const sent of sentences) {
         if (!accum) {
           accum = sent;
-        } else if ((accum + ' ' + sent).length <= 125) {
+        } else if ((accum + ' ' + sent).length <= 135) {
           accum += ' ' + sent;
         } else {
           break;
@@ -56,12 +58,24 @@ function simplifyStepForSlide(step: string, isCompactMode: boolean): string {
       }
     }
 
-    if (clean.length > 130) {
-      const cut = clean.substring(0, 125);
+    if (clean.length > 140) {
+      const cut = clean.substring(0, 135);
       const lastSpace = cut.lastIndexOf(' ');
-      clean = (lastSpace > 75 ? cut.substring(0, lastSpace) : cut) + '...';
+      clean = (lastSpace > 80 ? cut.substring(0, lastSpace) : cut);
+      clean = clean
+        .replace(/,\s*(?:then|and|or|with|to|in|for|until|while|after|before|by|into|over|from)?\s*$/i, '')
+        .replace(/\s+(?:then|and|or|with|to|in|for|until|while|after|before|by|into|over|from)\s*$/i, '')
+        .trim();
+      if (!/[.!?]$/.test(clean)) {
+        clean += '...';
+      }
     }
   }
+
+  // Ensure step never ends with a dangling conjunction or preposition
+  clean = clean
+    .replace(/,\s*(?:then|and|or|with|to|in|for|until|while|after|before|by|into|over|from)\s*\.{0,3}$/i, '.')
+    .replace(/\s+(?:then|and|or|with|to|in|for|until|while|after|before|by|into|over|from)\s*\.{0,3}$/i, '.');
 
   return clean;
 }
@@ -90,9 +104,60 @@ function cleanIngredientForSlide(name: string): string {
     .replace(/Maldon salt and fresh cracked black pepper/gi, 'Salt & black pepper')
     .replace(/Maldon salt and/gi, 'Salt &')
     .replace(/Dash of\s*/gi, '')
+    .replace(/\(just for dusting\)/gi, '(optional)')
+    .replace(/\(for dusting\)/gi, '(dusting)')
+    .replace(/\(room temperature\)/gi, '(room temp)')
     .replace(/,\s*$/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+interface ParsedIngredient {
+  amount: string;
+  name: string;
+}
+
+// Separates amount & unit from item name so amounts can be styled prominently
+function parseIngredient(rawName: string, rawAmount?: string): ParsedIngredient {
+  let name = (rawName || '').trim();
+  let amount = (rawAmount || '').trim();
+
+  if (!amount && name) {
+    // 1 16-ounce container cottage cheese -> amount: 16 oz, name: cottage cheese
+    const containerMatch = name.match(/^(\d+\s+)?(\d+[\s-]ounce|\d+[\s-]oz)\s+(?:container|tub|pack|can|package|block|jar)\s+(?:of\s+)?(.*)/i);
+    if (containerMatch) {
+      amount = containerMatch[2].replace(/[\s-]ounce/i, ' oz').replace(/[\s-]oz/i, ' oz');
+      name = containerMatch[3];
+    } else {
+      // Numbers with units: e.g. "1/3 cup sugar", "1 tsp vanilla"
+      const unitMatch = name.match(/^([\d/.-]+(?:\s*-\s*[\d/.-]+)?(?:\s+[\d/.-]+)?)\s*(cups?|tablespoons?|tbsp|teaspoons?|tsp|pounds?|lbs?|ounces?|oz|grams?|g|kg|ml|liters?|pinches|pinch|cloves?|slices?|cans?|stalks?|sprigs?|bunch(?:es)?|packages?|pkgs?|medium|large|small)?\b(?:\s+(?:of\s+)?)(.*)/i);
+      if (unitMatch) {
+        const qty = unitMatch[1].trim();
+        const unit = (unitMatch[2] || '').trim();
+        amount = unit ? `${qty} ${unit}` : qty;
+        name = unitMatch[3].trim();
+      } else {
+        // Just number or range: e.g. "11-12 Biscoff cookies", "3 eggs"
+        const numOnlyMatch = name.match(/^([\d/.-]+(?:\s*-\s*[\d/.-]+)?)\s+(.*)/);
+        if (numOnlyMatch) {
+          amount = numOnlyMatch[1].trim();
+          name = numOnlyMatch[2].trim();
+        }
+      }
+    }
+  }
+
+  name = cleanIngredientForSlide(name);
+
+  amount = amount
+    .replace(/tablespoons?\b/gi, 'tbsp')
+    .replace(/teaspoons?\b/gi, 'tsp')
+    .replace(/ounces?\b/gi, 'oz')
+    .replace(/pounds?\b/gi, 'lb')
+    .replace(/grams?\b/gi, 'g')
+    .trim();
+
+  return { amount, name };
 }
 
 export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, theme, aspectRatio }) => {
@@ -136,11 +201,12 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
     }
   }
 
-  // 2 or 3 columns for ingredients
+  // 1 or 2 columns for ingredients in 1:1, NEVER 3 cramped columns
   let computedColumns = config.ingredientColumns;
   if (computedColumns === 'auto') {
     if (aspectRatio === '1:1') {
-      computedColumns = numIngs >= 6 ? '3' : numIngs >= 3 ? '2' : '1';
+      // 1:1 square has limited width: max 2 columns ensures legible text and zero truncation
+      computedColumns = numIngs >= 4 ? '2' : '1';
     } else {
       computedColumns = numIngs >= 8 ? '3' : numIngs >= 4 ? '2' : '1';
     }
@@ -227,15 +293,18 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
           <div 
             className={`ingredients-grid cols-${computedColumns} ${numIngs >= 8 ? 'grid-dense' : ''}`}
           >
-            {recipe.ingredients.map((ing, idx) => (
-              <div key={idx} className="ingredient-pill">
-                <span className="ing-dot"></span>
-                <span className="ing-text">
-                  <span className="ing-name">{cleanIngredientForSlide(ing.name)}</span>
-                  {ing.amount && <span className="ing-amount"> — {ing.amount}</span>}
-                </span>
-              </div>
-            ))}
+            {recipe.ingredients.map((ing, idx) => {
+              const parsed = parseIngredient(ing.name, ing.amount);
+              return (
+                <div key={idx} className="ingredient-pill">
+                  <span className="ing-dot"></span>
+                  <span className="ing-text">
+                    {parsed.amount && <span className="ing-amount-badge">{parsed.amount}</span>}
+                    <span className="ing-name">{parsed.name}</span>
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
 

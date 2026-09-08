@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import fs from 'fs';
 import path from 'path';
+import { getAvailableAudioTracks } from './server/audioManager.js';
+import { scheduleBatch } from './server/batchScheduler.js';
 
 // Vite Plugin to sync Telegram credentials and proxy external recipe images (bypasses hotlink protection & CORS)
 function slydeServerPlugin() {
@@ -712,6 +714,57 @@ function slydeServerPlugin() {
             res.end(`Proxy error: ${err.message}`);
             return;
           }
+        }
+
+        // 3. Audio Tracks API
+        if (req.url === '/api/audio-tracks' && req.method === 'GET') {
+          try {
+            const tracks = getAvailableAudioTracks();
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({
+              success: true,
+              count: tracks.length,
+              tracks: tracks.map(t => ({ filename: t.filename, vibe: t.vibe }))
+            }));
+          } catch (e) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ success: false, message: e.message }));
+          }
+          return;
+        }
+
+        // 4. Batch Daily Scheduler API
+        const scheduledPostsPath = path.resolve(__dirname, 'scheduled_posts.json');
+        if (req.url === '/api/batch-schedule' && req.method === 'GET') {
+          if (fs.existsSync(scheduledPostsPath)) {
+            try {
+              const data = JSON.parse(fs.readFileSync(scheduledPostsPath, 'utf-8'));
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: true, posts: data.posts || [], lastUpdated: data.lastUpdated }));
+              return;
+            } catch (e) {}
+          }
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ success: true, posts: [] }));
+          return;
+        }
+
+        if (req.url === '/api/batch-schedule' && req.method === 'POST') {
+          let body = '';
+          req.on('data', chunk => { body += chunk; });
+          req.on('end', async () => {
+            try {
+              const options = JSON.parse(body);
+              const result = await scheduleBatch(options);
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify(result));
+            } catch (e) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, message: e.message }));
+            }
+          });
+          return;
         }
 
         next();

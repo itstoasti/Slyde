@@ -8,6 +8,7 @@
     "start": "concurrently -k -n \"studio,bot\" -c \"cyan,magenta\" \"vite\" \"node bot.js\"",
     "studio": "vite",
     "bot": "node bot.js",
+    "batch": "node scripts/batch-schedule.js",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },

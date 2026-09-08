@@ -36,6 +36,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Determine config type from query, URL path, or body
   const type = (req.query.type as string) || (req.body && req.body._type) || 'all';
 
+function maskSecret(str: string): string {
+  if (!str || str.length < 8) return str ? '••••••••' : '';
+  return str.substring(0, 4) + '••••••••' + str.substring(str.length - 4);
+}
+
   // 1. TELEGRAM CONFIG
   if (type === 'telegram') {
     const defaultTelegram = {
@@ -48,9 +53,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (req.method === 'POST') {
       const { botToken, chatId, includeCaption, sendAsAlbum, inboundListenerEnabled, messageThreadId } = req.body || {};
+      const current = readJsonFile('telegram_config.json', {});
       const updated = {
         ...defaultTelegram,
-        ...(botToken !== undefined && { botToken }),
+        ...current,
+        // Only update botToken if a non-masked token is sent
+        ...(botToken !== undefined && !botToken.includes('••••') && { botToken }),
         ...(chatId !== undefined && { chatId }),
         ...(includeCaption !== undefined && { includeCaption }),
         ...(sendAsAlbum !== undefined && { sendAsAlbum }),
@@ -58,14 +66,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ...(messageThreadId !== undefined && { messageThreadId })
       };
       writeJsonFile('telegram_config.json', updated);
-      return res.status(200).json({ success: true, config: updated });
+      return res.status(200).json({ success: true, config: { ...updated, botToken: maskSecret(updated.botToken) } });
     }
 
     const saved = readJsonFile('telegram_config.json', {});
+    const rawToken = process.env.TELEGRAM_BOT_TOKEN || saved.botToken || '';
     return res.status(200).json({
       ...defaultTelegram,
       ...saved,
-      botToken: process.env.TELEGRAM_BOT_TOKEN || saved.botToken || '',
+      hasToken: Boolean(rawToken),
+      botToken: maskSecret(rawToken),
       chatId: process.env.TELEGRAM_CHAT_ID || saved.chatId || '1294588369'
     });
   }
@@ -81,17 +91,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (req.method === 'POST') {
       const current = readJsonFile('gemini_config.json', defaultAi);
-      const updated = { ...current, ...(req.body || {}) };
+      const incoming = req.body || {};
+      const updated = {
+        ...current,
+        ...incoming,
+        ...(incoming.geminiApiKey && incoming.geminiApiKey.includes('••••') && { geminiApiKey: current.geminiApiKey }),
+        ...(incoming.openRouterApiKey && incoming.openRouterApiKey.includes('••••') && { openRouterApiKey: current.openRouterApiKey })
+      };
       writeJsonFile('gemini_config.json', updated);
-      return res.status(200).json({ success: true, config: updated });
+      return res.status(200).json({ success: true, config: { ...updated, geminiApiKey: maskSecret(updated.geminiApiKey), openRouterApiKey: maskSecret(updated.openRouterApiKey) } });
     }
 
     const saved = readJsonFile('gemini_config.json', {});
+    const rawGemini = process.env.GEMINI_API_KEY || saved.geminiApiKey || '';
+    const rawOpenRouter = process.env.OPENROUTER_API_KEY || saved.openRouterApiKey || '';
     return res.status(200).json({
       ...defaultAi,
       ...saved,
-      geminiApiKey: process.env.GEMINI_API_KEY || saved.geminiApiKey || '',
-      openRouterApiKey: process.env.OPENROUTER_API_KEY || saved.openRouterApiKey || ''
+      hasGeminiKey: Boolean(rawGemini),
+      geminiApiKey: maskSecret(rawGemini),
+      hasOpenRouterKey: Boolean(rawOpenRouter),
+      openRouterApiKey: maskSecret(rawOpenRouter)
     });
   }
 
@@ -137,13 +157,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     if (req.method === 'POST') {
-      const updated = { ...defaultBuffer, ...(req.body || {}) };
+      const current = readJsonFile('buffer_config.json', defaultBuffer);
+      const incoming = req.body || {};
+      const updated = {
+        ...current,
+        ...incoming,
+        ...(incoming.accessToken && incoming.accessToken.includes('••••') && { accessToken: current.accessToken })
+      };
       writeJsonFile('buffer_config.json', updated);
-      return res.status(200).json({ success: true, config: updated });
+      return res.status(200).json({ success: true, config: { ...updated, accessToken: maskSecret(updated.accessToken) } });
     }
 
     const saved = readJsonFile('buffer_config.json', defaultBuffer);
-    return res.status(200).json({ ...defaultBuffer, ...saved });
+    return res.status(200).json({
+      ...defaultBuffer,
+      ...saved,
+      hasToken: Boolean(saved.accessToken),
+      accessToken: maskSecret(saved.accessToken || '')
+    });
   }
 
   // Default: Return status

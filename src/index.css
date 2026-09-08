@@ -1585,6 +1585,17 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   font-weight: 600;
 }
 
+.ing-amount-badge {
+  color: #c2410c !important;
+  font-weight: 800;
+  margin-right: 3px;
+  flex-shrink: 0;
+}
+
+.card-style-dark-glass .ing-amount-badge {
+  color: #f59e0b !important;
+}
+
 /* Method Step Items */
 .method-list {
   display: flex;
@@ -2630,37 +2641,56 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .slide-2.aspect-1-1 .ingredients-grid {
-  gap: 2px;
-  margin-bottom: 1.5px;
+  gap: 2.5px 4px;
+  margin-bottom: 2px;
 }
 
 .slide-2.aspect-1-1 .ingredient-pill {
-  padding: 1.5px 4.5px;
-  min-height: 13px;
-  border-radius: 3px;
-  gap: 2.5px;
+  padding: 2px 5px;
+  min-height: 15px;
+  border-radius: 4px;
+  gap: 3px;
+  align-items: baseline;
 }
 
 .slide-2.aspect-1-1 .ing-dot {
-  width: 2.5px;
-  height: 2.5px;
+  width: 3px;
+  height: 3px;
   flex-shrink: 0;
+  align-self: center;
 }
 
 .slide-2.aspect-1-1 .ing-text {
-  font-size: calc(0.55rem * var(--font-scale, 1));
+  font-size: calc(0.58rem * var(--font-scale, 1));
   font-weight: 600;
-  line-height: 1.10;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.18;
+  white-space: normal;
+  word-break: break-word;
   max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 3px;
+}
+
+.slide-2.aspect-1-1 .ing-amount-badge {
+  font-weight: 800;
+  color: #c2410c;
+  font-size: calc(0.58rem * var(--font-scale, 1));
+  flex-shrink: 0;
 }
 
 .slide-2.aspect-1-1 .ing-name {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  font-weight: 600;
+  color: #111827;
+}
+
+.card-style-dark-glass .slide-2.aspect-1-1 .ing-amount-badge,
+.slide-2.aspect-1-1.card-style-dark-glass .ing-amount-badge {
+  color: #f59e0b;
 }
 
 .slide-2.aspect-1-1 .method-list {

@@ -715,9 +715,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Security: reject messages from unauthorized chats (if allowlist is configured)
-  if (allowedChatIds.size > 0 && !allowedChatIds.has(String(chatId))) {
-    console.warn(`Rejected message from unauthorized chat ${chatId}`);
-    return res.status(200).send('OK (unauthorized)');
+  const senderId = String(msg.from?.id || '');
+  const chatStr = String(chatId);
+  const senderChatStr = String(msg.sender_chat?.id || '');
+
+  if (allowedChatIds.size > 0) {
+    const isAllowed = 
+      allowedChatIds.has(chatStr) || 
+      (senderId && allowedChatIds.has(senderId)) || 
+      (senderChatStr && allowedChatIds.has(senderChatStr));
+
+    if (!isAllowed) {
+      console.warn(`Rejected message from unauthorized chat ${chatStr} (sender: ${senderId || senderChatStr || 'unknown'})`);
+      return res.status(200).send('OK (unauthorized)');
+    }
   }
 
   if (text.startsWith('/start') || text.startsWith('/help')) {
