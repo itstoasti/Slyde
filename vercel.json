@@ -57,11 +57,15 @@
       "destination": "/api/$1"
     },
     {
+      "source": "/snaprecipes-app-icon.png",
+      "destination": "/snaprecipes-app-icon.png"
+    },
+    {
       "source": "/render.html",
       "destination": "/render.html"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/|.*\\.[\\w]+$).*)",
       "destination": "/index.html"
     }
   ]

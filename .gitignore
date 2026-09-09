@@ -39,3 +39,7 @@ ai_config.json
 scheduled_posts.json
 batch_urls.txt
 
+# Explicitly track public assets (overrides any global ~/.gitignore rules)
+!public/
+!public/**
+

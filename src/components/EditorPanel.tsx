@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { RecipeData, ThemeConfig, AspectRatio } from '../types';
 import { THEME_PRESETS } from '../data/presets';
+import { getBrandLogoUrl, DEFAULT_BRAND_LOGO } from '../utils/imageProxy';
 import { 
   Sparkles, 
   UtensilsCrossed, 
@@ -384,7 +385,16 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
                 <div style={{ width: 52, height: 52, borderRadius: 13, overflow: 'hidden', border: '2px solid rgba(255, 255, 255, 0.15)', background: '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
                   {recipe.brandLogo ? (
-                    <img src={recipe.brandLogo} alt="App Logo Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img
+                      src={getBrandLogoUrl(recipe.brandLogo)}
+                      alt="App Logo Preview"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => {
+                        if (e.currentTarget.src !== DEFAULT_BRAND_LOGO) {
+                          e.currentTarget.src = DEFAULT_BRAND_LOGO;
+                        }
+                      }}
+                    />
                   ) : (
                     <span style={{ fontSize: '0.62rem', color: 'var(--app-text-muted)', textAlign: 'center', padding: 2 }}>No Logo</span>
                   )}
@@ -404,7 +414,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                   
                   <button
                     type="button"
-                    onClick={() => handleFieldChange('brandLogo', '/snaprecipes-app-icon.png')}
+                    onClick={() => handleFieldChange('brandLogo', DEFAULT_BRAND_LOGO)}
                     style={{ background: 'transparent', border: 'none', color: 'var(--app-primary)', fontSize: '0.70rem', cursor: 'pointer', textAlign: 'left', fontWeight: 600, padding: 0 }}
                   >
                     ✦ Use SnapRecipes App Icon

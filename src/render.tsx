@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { RecipeData, ThemeConfig, AspectRatio } from './types';
 import { RECIPE_PRESETS, THEME_PRESETS } from './data/presets';
+import { DEFAULT_BRAND_LOGO } from './assets/defaultBrandLogo';
 import { Slide1Hero } from './components/slides/Slide1Hero';
 import { Slide2RecipeCard } from './components/slides/Slide2RecipeCard';
 import { Slide3CTA } from './components/slides/Slide3CTA';
@@ -57,6 +58,8 @@ const normalizeRecipe = (r: any): RecipeData => {
     brandName: r.brandName || base.brandName,
     brandSubtitle: r.brandSubtitle || base.brandSubtitle,
     brandPillBadge: r.brandPillBadge || base.brandPillBadge,
+    brandLogo: (!r.brandLogo || r.brandLogo === '/snaprecipes-app-icon.png') ? DEFAULT_BRAND_LOGO : r.brandLogo,
+    brandLogoSize: r.brandLogoSize || base.brandLogoSize || 58,
     ctaButtonText: r.ctaButtonText || base.ctaButtonText,
     ctaUrl: r.ctaUrl || base.ctaUrl,
     socialHandle: r.socialHandle || base.socialHandle,

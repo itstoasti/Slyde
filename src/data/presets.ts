@@ -1,4 +1,5 @@
 import { RecipeData, ThemeConfig, ThemeId, AutoPilotConfig, PerkItem } from '../types';
+import { DEFAULT_BRAND_LOGO } from '../assets/defaultBrandLogo';
 
 export const DEFAULT_SLIDE2_CONFIG = {
   density: 'auto' as const,
@@ -231,7 +232,7 @@ export const RECIPE_PRESETS: RecipeData[] = [
     brandName: 'SnapRecipes',
     brandSubtitle: 'Save any recipe in one tap.',
     brandPillBadge: 'AD-FREE · NO BLOG RANTS · JUST RECIPES',
-    brandLogo: '/snaprecipes-app-icon.png',
+    brandLogo: DEFAULT_BRAND_LOGO,
     ctaButtonText: 'Get the app — free',
     ctaUrl: 'snaprecipes.xyz',
     socialHandle: '@snaprecipes',
@@ -272,7 +273,7 @@ export const RECIPE_PRESETS: RecipeData[] = [
     brandName: 'SnapRecipes',
     brandSubtitle: 'Save any recipe in one tap.',
     brandPillBadge: 'AD-FREE · NO BLOG RANTS · JUST RECIPES',
-    brandLogo: '/snaprecipes-app-icon.png',
+    brandLogo: DEFAULT_BRAND_LOGO,
     ctaButtonText: 'Get the app — free',
     ctaUrl: 'snaprecipes.xyz',
     socialHandle: '@snaprecipes',
@@ -317,7 +318,7 @@ export const RECIPE_PRESETS: RecipeData[] = [
     brandName: 'SnapRecipes',
     brandSubtitle: 'Save any recipe in one tap.',
     brandPillBadge: 'AD-FREE · NO BLOG RANTS · JUST RECIPES',
-    brandLogo: '/snaprecipes-app-icon.png',
+    brandLogo: DEFAULT_BRAND_LOGO,
     ctaButtonText: 'Get the app — free',
     ctaUrl: 'snaprecipes.xyz',
     socialHandle: '@snaprecipes',
@@ -352,7 +353,7 @@ export const RECIPE_PRESETS: RecipeData[] = [
     brandName: 'SnapRecipes',
     brandSubtitle: 'Save any recipe in one tap.',
     brandPillBadge: 'AD-FREE · NO BLOG RANTS · JUST RECIPES',
-    brandLogo: '/snaprecipes-app-icon.png',
+    brandLogo: DEFAULT_BRAND_LOGO,
     ctaButtonText: 'Get the app — free',
     ctaUrl: 'snaprecipes.xyz',
     socialHandle: '@snaprecipes',

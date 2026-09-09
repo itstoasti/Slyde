@@ -1,6 +1,6 @@
 import React from 'react';
 import { RecipeData, ThemeConfig, AspectRatio } from '../../types';
-import { getProxiedImageUrl } from '../../utils/imageProxy';
+import { getBrandLogoUrl, DEFAULT_BRAND_LOGO } from '../../utils/imageProxy';
 
 interface Slide3CTAProps {
   recipe: RecipeData;
@@ -9,7 +9,7 @@ interface Slide3CTAProps {
 }
 
 export const Slide3CTA: React.FC<Slide3CTAProps> = ({ recipe, theme, aspectRatio }) => {
-  const logoUrl = recipe.brandLogo ? getProxiedImageUrl(recipe.brandLogo) : null;
+  const logoUrl = getBrandLogoUrl(recipe.brandLogo);
   const logoSize = recipe.brandLogoSize || 52;
   const logoRadius = Math.max(8, Math.round(logoSize * 0.26));
 
@@ -51,6 +51,11 @@ export const Slide3CTA: React.FC<Slide3CTAProps> = ({ recipe, theme, aspectRatio
                 alt={recipe.brandName}
                 className="cta-app-logo-img"
                 crossOrigin="anonymous"
+                onError={(e) => {
+                  if (e.currentTarget.src !== DEFAULT_BRAND_LOGO) {
+                    e.currentTarget.src = DEFAULT_BRAND_LOGO;
+                  }
+                }}
               />
             </div>
           )}
@@ -79,6 +84,11 @@ export const Slide3CTA: React.FC<Slide3CTAProps> = ({ recipe, theme, aspectRatio
               alt=""
               className="brand-mini-logo-icon"
               crossOrigin="anonymous"
+              onError={(e) => {
+                if (e.currentTarget.src !== DEFAULT_BRAND_LOGO) {
+                  e.currentTarget.src = DEFAULT_BRAND_LOGO;
+                }
+              }}
             />
           ) : (
             <span className="brand-square-icon"></span>

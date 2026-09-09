@@ -118,11 +118,11 @@ function maskSecret(str: string): string {
   // 3. BRANDING DEFAULTS
   if (type === 'branding') {
     const defaultBranding = {
-      brandName: 'slyde.ai',
-      socialHandle: '@slyde',
-      ctaUrl: 'slyde.ai/recipe',
-      brandLogo: '',
-      brandLogoSize: 36
+      brandName: 'SnapRecipes',
+      socialHandle: '@snaprecipes',
+      ctaUrl: 'snaprecipes.xyz',
+      brandLogo: '/snaprecipes-app-icon.png',
+      brandLogoSize: 58
     };
 
     if (req.method === 'POST') {

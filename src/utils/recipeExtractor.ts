@@ -1,4 +1,5 @@
 import { RecipeData } from '../types';
+import { DEFAULT_BRAND_LOGO } from '../assets/defaultBrandLogo';
 
 // Helper to format ISO 8601 duration (e.g., PT15M -> 15m)
 function formatIsoDuration(duration?: string): string {
@@ -307,7 +308,7 @@ function cleanIngredient(raw: string): string {
           brandName,
           brandSubtitle: 'Save any recipe in one tap.',
           brandPillBadge: 'AD-FREE · NO BLOG RANTS · JUST RECIPES',
-          brandLogo: brandDefaults?.brandLogo || '/snaprecipes-app-icon.png',
+          brandLogo: brandDefaults?.brandLogo || DEFAULT_BRAND_LOGO,
           brandLogoSize: brandDefaults?.brandLogoSize || 58,
           ctaButtonText: 'Get the app — free',
           ctaUrl,
@@ -362,7 +363,7 @@ function cleanIngredient(raw: string): string {
     brandName,
     brandSubtitle: 'Save any recipe in one tap.',
     brandPillBadge: 'AD-FREE · NO BLOG RANTS · JUST RECIPES',
-    brandLogo: brandDefaults?.brandLogo || '/snaprecipes-app-icon.png',
+    brandLogo: brandDefaults?.brandLogo || DEFAULT_BRAND_LOGO,
     brandLogoSize: brandDefaults?.brandLogoSize || 58,
     ctaButtonText: 'Get the app — free',
     ctaUrl,

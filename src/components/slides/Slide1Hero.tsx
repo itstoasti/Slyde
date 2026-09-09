@@ -1,6 +1,6 @@
 import React from 'react';
 import { RecipeData, ThemeConfig, AspectRatio } from '../../types';
-import { getProxiedImageUrl } from '../../utils/imageProxy';
+import { getProxiedImageUrl, getBrandLogoUrl, DEFAULT_BRAND_LOGO } from '../../utils/imageProxy';
 
 interface Slide1HeroProps {
   recipe: RecipeData;
@@ -38,7 +38,7 @@ export const Slide1Hero: React.FC<Slide1HeroProps> = ({ recipe, theme, aspectRat
   // Top right stat badge (e.g. 10 MIN · 4 SERVINGS)
   const cleanRightBadge = recipe.highlightBadge || `${recipe.cookTime || recipe.prepTime} · ${recipe.servings} SERVINGS`;
   const proxiedImage = getProxiedImageUrl(recipe.heroImage);
-  const logoUrl = recipe.brandLogo ? getProxiedImageUrl(recipe.brandLogo) : null;
+  const logoUrl = getBrandLogoUrl(recipe.brandLogo);
 
   return (
     <div
@@ -65,7 +65,17 @@ export const Slide1Hero: React.FC<Slide1HeroProps> = ({ recipe, theme, aspectRat
       <div className="slide-top-bar">
         <div className="brand-pill-badge">
           {logoUrl ? (
-            <img src={logoUrl} alt={recipe.brandName} className="brand-pill-logo" crossOrigin="anonymous" />
+            <img
+              src={logoUrl}
+              alt={recipe.brandName}
+              className="brand-pill-logo"
+              crossOrigin="anonymous"
+              onError={(e) => {
+                if (e.currentTarget.src !== DEFAULT_BRAND_LOGO) {
+                  e.currentTarget.src = DEFAULT_BRAND_LOGO;
+                }
+              }}
+            />
           ) : (
             <span className="brand-pill-dot"></span>
           )}

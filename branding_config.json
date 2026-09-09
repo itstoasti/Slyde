@@ -1,5 +1,7 @@
 {
   "brandName": "SnapRecipes",
   "socialHandle": "@snaprecipes",
-  "ctaUrl": "snaprecipes.xyz"
+  "ctaUrl": "snaprecipes.xyz",
+  "brandLogo": "/snaprecipes-app-icon.png",
+  "brandLogoSize": 58
 }

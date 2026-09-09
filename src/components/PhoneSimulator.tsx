@@ -3,7 +3,7 @@ import { RecipeData, ThemeConfig, AspectRatio } from '../types';
 import { Slide1Hero } from './slides/Slide1Hero';
 import { Slide2RecipeCard } from './slides/Slide2RecipeCard';
 import { Slide3CTA } from './slides/Slide3CTA';
-import { getProxiedImageUrl } from '../utils/imageProxy';
+import { getBrandLogoUrl, DEFAULT_BRAND_LOGO } from '../utils/imageProxy';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -120,7 +120,7 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
 
   const phoneHeight = 675;
   const exportSlideHeight = aspectRatio === '1:1' ? 360 : aspectRatio === '4:5' ? 450 : 640;
-  const logoUrl = recipe.brandLogo ? getProxiedImageUrl(recipe.brandLogo) : null;
+  const logoUrl = getBrandLogoUrl(recipe.brandLogo);
   const brandUsername = (recipe.brandName || 'snaprecipes').toLowerCase().replace(/[^a-z0-9_]/g, '_');
 
   return (
@@ -262,7 +262,16 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
                       <div className="instagram-avatar-ring">
                         <div className="instagram-avatar-inner">
                           {logoUrl ? (
-                            <img src={logoUrl} alt="" crossOrigin="anonymous" />
+                            <img
+                              src={logoUrl}
+                              alt=""
+                              crossOrigin="anonymous"
+                              onError={(e) => {
+                                if (e.currentTarget.src !== DEFAULT_BRAND_LOGO) {
+                                  e.currentTarget.src = DEFAULT_BRAND_LOGO;
+                                }
+                              }}
+                            />
                           ) : (
                             (recipe.brandName || 'S').charAt(0).toUpperCase()
                           )}
@@ -484,7 +493,16 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
                       <div className="tiktok-avatar-wrap">
                         <div className="tiktok-avatar-img">
                           {logoUrl ? (
-                            <img src={logoUrl} alt="" crossOrigin="anonymous" />
+                            <img
+                              src={logoUrl}
+                              alt=""
+                              crossOrigin="anonymous"
+                              onError={(e) => {
+                                if (e.currentTarget.src !== DEFAULT_BRAND_LOGO) {
+                                  e.currentTarget.src = DEFAULT_BRAND_LOGO;
+                                }
+                              }}
+                            />
                           ) : (
                             recipe.brandName.charAt(0)
                           )}

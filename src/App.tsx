@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RecipeData, ThemeConfig, AspectRatio, TelegramConfig, StudioViewMode, AutoPilotConfig, ThemeId } from './types';
 import { RECIPE_PRESETS, THEME_PRESETS, DEFAULT_SLIDE2_CONFIG, DEFAULT_AUTOPILOT_CONFIG, DEFAULT_PERKS } from './data/presets';
+import { DEFAULT_BRAND_LOGO } from './assets/defaultBrandLogo';
 import { Header } from './components/Header';
 import { RecipeQueueRibbon } from './components/RecipeQueueRibbon';
 import { UrlInputBar } from './components/UrlInputBar';
@@ -145,14 +146,18 @@ const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
     const saved = localStorage.getItem(STORAGE_KEY_BRANDING);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (!parsed.brandLogo || parsed.brandLogo === '/snaprecipes-app-icon.png') {
+          parsed.brandLogo = DEFAULT_BRAND_LOGO;
+        }
+        return parsed;
       } catch (e) {}
     }
     return {
       brandName: 'SnapRecipes',
       socialHandle: '@snaprecipes',
       ctaUrl: 'snaprecipes.xyz',
-      brandLogo: '/snaprecipes-app-icon.png',
+      brandLogo: DEFAULT_BRAND_LOGO,
       brandLogoSize: 58
     };
   });
@@ -348,7 +353,7 @@ const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
       brandName: brandDefaults.brandName,
       brandSubtitle: 'Save any recipe in one tap.',
       brandPillBadge: 'AD-FREE · NO BLOG RANTS · JUST RECIPES',
-      brandLogo: brandDefaults.brandLogo || '/snaprecipes-app-icon.png',
+      brandLogo: brandDefaults.brandLogo || DEFAULT_BRAND_LOGO,
       brandLogoSize: brandDefaults.brandLogoSize || 58,
       ctaButtonText: 'Get the app — free',
       ctaUrl: brandDefaults.ctaUrl,
