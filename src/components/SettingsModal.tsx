@@ -30,14 +30,25 @@ import {
   Share2,
   Check,
   Cpu,
-  Zap
+  Zap,
+  Music,
+  Pause
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { 
+  getPreferredAudioVibe, 
+  setPreferredAudioVibe, 
+  AUDIO_VIBE_PRESETS, 
+  AudioVibeOption,
+  fetchAudioTracks, 
+  AudioTrackInfo, 
+  DEFAULT_FOOD_TRACKS 
+} from '../utils/audioManager';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'buffer' | 'ai' | 'telegram' | 'autopilot';
+  initialTab?: 'buffer' | 'ai' | 'telegram' | 'autopilot' | 'audio';
   config: TelegramConfig;
   onSaveConfig: (updated: TelegramConfig) => void;
   autoPilotConfig: AutoPilotConfig;
@@ -64,13 +75,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const defaultBotToken = '';
   const defaultChatId = '1294588369';
 
-  const [activeTab, setActiveTab] = useState<'buffer' | 'ai' | 'telegram' | 'autopilot'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'buffer' | 'ai' | 'telegram' | 'autopilot' | 'audio'>(initialTab);
   const [formData, setFormData] = useState<TelegramConfig>(() => ({
     ...config,
     botToken: config?.botToken?.trim() || '',
     chatId: (config?.chatId && !config.chatId.includes('Claaaaaark')) ? config.chatId.trim() : defaultChatId
   }));
   const [autoPilotForm, setAutoPilotForm] = useState<AutoPilotConfig>(autoPilotConfig);
+
+  // Audio Settings State (Defaults to Lo-Fi)
+  const [preferredVibe, setPreferredVibeState] = useState<'lofi' | 'acoustic' | 'upbeat' | 'auto'>(() => getPreferredAudioVibe());
+  const [audioTracksList, setAudioTracksList] = useState<AudioTrackInfo[]>(DEFAULT_FOOD_TRACKS);
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const settingsAudioRef = React.useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    fetchAudioTracks().then(setAudioTracksList);
+  }, [isOpen]);
+
+  const handleTogglePlayAudio = (track: AudioTrackInfo) => {
+    if (!settingsAudioRef.current) {
+      settingsAudioRef.current = new Audio(track.url);
+      settingsAudioRef.current.onended = () => setPlayingAudioId(null);
+    }
+    if (playingAudioId === track.id) {
+      settingsAudioRef.current.pause();
+      setPlayingAudioId(null);
+    } else {
+      settingsAudioRef.current.src = track.url;
+      settingsAudioRef.current.play().then(() => setPlayingAudioId(track.id)).catch(() => {});
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (settingsAudioRef.current) {
+        settingsAudioRef.current.pause();
+        settingsAudioRef.current = null;
+      }
+    };
+  }, [isOpen]);
 
   // Unified AI Config State (Gemini & OpenRouter)
   const [aiConfig, setAiConfig] = useState<AIConfig>(() => getStoredAIConfig());
@@ -414,6 +458,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             <Clock size={14} />
             <span>Auto-Pilot</span>
+          </button>
+          <button
+            type="button"
+            className={`editor-tab-btn ${activeTab === 'audio' ? 'active' : ''}`}
+            onClick={() => setActiveTab('audio')}
+          >
+            <Music size={14} />
+            <span>Audio & Music</span>
           </button>
         </div>
 
@@ -1027,6 +1079,142 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <span>{autoPilotLog}</span>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* ================= TAB 5: AUDIO & MUSIC ENGINE ================= */}
+          {activeTab === 'audio' && (
+            <div className="settings-section">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Music size={16} color="var(--app-accent)" />
+                  <span>Culinary Background Music Engine</span>
+                </div>
+                <span style={{ fontSize: '0.68rem', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
+                  ✓ 100% Royalty-Free & Commercial-Safe
+                </span>
+              </div>
+              <p style={{ fontSize: '0.80rem', color: 'var(--app-text-muted)', marginBottom: 16, lineHeight: 1.4 }}>
+                Select your preferred sound style for all vertical videos created by Slyde. All tracks are pre-cleared for YouTube Shorts, TikTok, and Instagram Reels with zero copyright strikes.
+              </p>
+
+              {/* Preferred Vibe Grid */}
+              <div style={{ marginBottom: 18 }}>
+                <label className="form-label" style={{ marginBottom: 8, display: 'block' }}>Default Soundtrack Vibe</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
+                  {AUDIO_VIBE_PRESETS.map((preset: AudioVibeOption) => {
+                    const isSelected = preferredVibe === preset.id;
+                    return (
+                      <div
+                        key={preset.id}
+                        onClick={() => {
+                          setPreferredVibeState(preset.id as any);
+                          setPreferredAudioVibe(preset.id as any);
+                        }}
+                        style={{
+                          background: isSelected ? 'rgba(245, 158, 11, 0.12)' : '#0d0d12',
+                          border: isSelected ? '1.5px solid var(--app-accent)' : '1px solid var(--app-border)',
+                          borderRadius: 8,
+                          padding: '10px 12px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <span style={{ fontWeight: 800, fontSize: '0.84rem', color: isSelected ? 'var(--app-accent)' : '#fff' }}>
+                            {preset.emoji} {preset.name}
+                          </span>
+                          {isSelected && <Check size={14} color="var(--app-accent)" />}
+                        </div>
+                        <p style={{ fontSize: '0.70rem', color: 'var(--app-text-dim)', margin: 0, lineHeight: 1.3 }}>
+                          {preset.description}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Track Library with 1-Click Auditioning */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <label className="form-label" style={{ margin: 0 }}>Available Sound Library ({audioTracksList.length} Tracks)</label>
+                  <span style={{ fontSize: '0.70rem', color: 'var(--app-text-muted)' }}>Tap to listen & preview</span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto', paddingRight: 4 }}>
+                  {audioTracksList.map((track) => {
+                    const isPlaying = playingAudioId === track.id;
+                    return (
+                      <div
+                        key={track.id}
+                        style={{
+                          background: '#0d0d12',
+                          border: isPlaying ? '1px solid var(--app-accent)' : '1px solid rgba(255,255,255,0.05)',
+                          borderRadius: 6,
+                          padding: '7px 10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 8
+                        }}
+                      >
+                        <div style={{ overflow: 'hidden', flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{
+                              fontSize: '0.62rem',
+                              fontWeight: 800,
+                              textTransform: 'uppercase',
+                              padding: '1px 5px',
+                              borderRadius: 4,
+                              background: track.vibe === 'lofi' ? 'rgba(168, 85, 247, 0.15)' : (track.vibe === 'acoustic' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(245, 158, 11, 0.15)'),
+                              color: track.vibe === 'lofi' ? '#c084fc' : (track.vibe === 'acoustic' ? '#60a5fa' : '#fbbf24')
+                            }}>
+                              {track.vibe}
+                            </span>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#f3f4f6', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {track.title}
+                            </span>
+                          </div>
+                          <p style={{ fontSize: '0.66rem', color: 'var(--app-text-dim)', margin: '2px 0 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {track.description}
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePlayAudio(track)}
+                          style={{
+                            background: isPlaying ? 'var(--app-accent)' : 'rgba(255,255,255,0.08)',
+                            color: isPlaying ? '#000' : '#fff',
+                            border: 'none',
+                            borderRadius: 6,
+                            padding: '4px 10px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            flexShrink: 0
+                          }}
+                        >
+                          {isPlaying ? <Pause size={10} /> : <Play size={10} />}
+                          <span>{isPlaying ? 'Stop' : 'Listen'}</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Informational Banner */}
+              <div style={{ marginTop: 14, background: '#121218', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: '1.1rem' }}>💡</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--app-text-muted)', lineHeight: 1.35 }}>
+                  Setting your default to <b>Cozy Lo-Fi Kitchen</b> ensures all future video exports and Telegram bot videos automatically use mellow lo-fi beats without having to configure each recipe manually.
+                </span>
               </div>
             </div>
           )}

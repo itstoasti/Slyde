@@ -123,7 +123,8 @@ export async function downloadAllSlidesZip(
 export async function createSlideshowVideo(
   slideElements: HTMLElement[],
   slideDurations: number | number[] = [2.5, 5.0, 1.5],
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  audioUrl?: string
 ): Promise<Blob> {
   const numSlides = slideElements.length;
   // Capture all slides as Image objects first with 3.0 pixelRatio for true HD
@@ -169,15 +170,61 @@ export async function createSlideshowVideo(
     slideStartFrames.push(slideStartFrames[i] + slideFrameCounts[i]);
   }
   const totalFrames = slideStartFrames[numSlides];
+  const totalSec = durationsArray.reduce((acc, d) => acc + d, 0);
 
   // Stream canvas
-  const stream = canvas.captureStream(fps);
-  
+  const canvasStream = canvas.captureStream(fps);
+  let finalStream: MediaStream = canvasStream;
+  let audioContext: AudioContext | null = null;
+  let audioSource: AudioBufferSourceNode | null = null;
+
+  // Mux background audio via Web Audio API if available
+  if (audioUrl && typeof window !== 'undefined') {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        audioContext = new AudioCtx();
+        const audioRes = await fetch(audioUrl);
+        if (audioRes.ok) {
+          const arrayBuf = await audioRes.arrayBuffer();
+          const decodedBuf = await audioContext.decodeAudioData(arrayBuf);
+
+          audioSource = audioContext.createBufferSource();
+          audioSource.buffer = decodedBuf;
+          audioSource.loop = true;
+
+          // Smooth volume envelope: 0.25s fade-in, 0.7s fade-out
+          const gainNode = audioContext.createGain();
+          const now = audioContext.currentTime;
+          gainNode.gain.setValueAtTime(0.001, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.85, now + 0.25);
+          gainNode.gain.setValueAtTime(0.85, now + Math.max(0.25, totalSec - 0.7));
+          gainNode.gain.exponentialRampToValueAtTime(0.001, now + totalSec);
+
+          const audioDest = audioContext.createMediaStreamDestination();
+          audioSource.connect(gainNode);
+          gainNode.connect(audioDest);
+          audioSource.start(now);
+
+          const audioTrack = audioDest.stream.getAudioTracks()[0];
+          if (audioTrack) {
+            finalStream = new MediaStream([
+              ...canvasStream.getVideoTracks(),
+              audioTrack
+            ]);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Exporter] Could not mux audio track into video:', err);
+    }
+  }
+
   const preferredTypes = [
     'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
     'video/mp4',
-    'video/webm;codecs=vp9',
-    'video/webm;codecs=vp8',
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
     'video/webm'
   ];
 
@@ -189,9 +236,9 @@ export async function createSlideshowVideo(
     }
   }
 
-  const mediaRecorder = new MediaRecorder(stream, {
+  const mediaRecorder = new MediaRecorder(finalStream, {
     mimeType: MediaRecorder.isTypeSupported(mimeType) ? mimeType : undefined,
-    videoBitsPerSecond: 5000000 // 5 Mbps HD quality for optimal upload speed and YouTube Shorts rendering
+    videoBitsPerSecond: 5000000 // 5 Mbps HD quality
   });
 
   const chunks: Blob[] = [];
@@ -201,11 +248,21 @@ export async function createSlideshowVideo(
 
   return new Promise((resolve, reject) => {
     mediaRecorder.onstop = () => {
+      try {
+        if (audioSource) audioSource.stop();
+        if (audioContext && audioContext.state !== 'closed') audioContext.close();
+      } catch (e) {}
       const blob = new Blob(chunks, { type: mimeType });
       resolve(blob);
     };
 
-    mediaRecorder.onerror = (err) => reject(err);
+    mediaRecorder.onerror = (err) => {
+      try {
+        if (audioSource) audioSource.stop();
+        if (audioContext && audioContext.state !== 'closed') audioContext.close();
+      } catch (e) {}
+      reject(err);
+    };
 
     mediaRecorder.start();
 

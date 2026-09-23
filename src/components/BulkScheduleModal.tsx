@@ -12,7 +12,7 @@ import {
   List
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { AUDIO_VIBE_PRESETS, AudioVibeOption } from '../utils/audioManager';
+import { AUDIO_VIBE_PRESETS, AudioVibeOption, getPreferredAudioVibe, setPreferredAudioVibe } from '../utils/audioManager';
 import { BufferConfig, BufferProfile } from '../types';
 
 interface BulkScheduleModalProps {
@@ -35,7 +35,7 @@ export const BulkScheduleModal: React.FC<BulkScheduleModalProps> = ({
     d.setDate(d.getDate() + 1);
     return d.toISOString().split('T')[0];
   });
-  const [musicVibe, setMusicVibe] = useState<'auto' | 'lofi' | 'acoustic' | 'upbeat'>('auto');
+  const [musicVibe, setMusicVibe] = useState<'lofi' | 'acoustic' | 'upbeat' | 'auto'>(() => getPreferredAudioVibe());
   const [instagramFormat, setInstagramFormat] = useState<'carousel' | 'video'>('carousel');
 
   // Buffer state
@@ -324,7 +324,11 @@ export const BulkScheduleModal: React.FC<BulkScheduleModalProps> = ({
                     <select
                       className="form-select"
                       value={musicVibe}
-                      onChange={(e) => setMusicVibe(e.target.value as any)}
+                      onChange={(e) => {
+                        const v = e.target.value as any;
+                        setMusicVibe(v);
+                        setPreferredAudioVibe(v);
+                      }}
                     >
                       {AUDIO_VIBE_PRESETS.map((p: AudioVibeOption) => (
                         <option key={p.id} value={p.id}>

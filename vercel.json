@@ -4,7 +4,8 @@
   "functions": {
     "api/telegram-webhook.ts": {
       "memory": 2048,
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "public/audio/**"
     },
     "api/publish-telegram.ts": {
       "memory": 1024,

@@ -228,14 +228,26 @@ async function extractRecipe(recipeUrl, brandDefaults) {
 
   let method = [];
   if (Array.isArray(recipeObj?.recipeInstructions)) {
-    method = recipeObj.recipeInstructions.map((s) => {
-      const txt = typeof s === 'string' ? s : (s.text || '');
-      return decodeHtmlEntities(txt)
-        .replace(/^Step\s*\d+:\s*/i, '')
-        .replace(/^\d+\.\s*/, '')
-        .replace(/Recipe developed by.*/i, '')
-        .trim();
-    }).filter(Boolean);
+    const rawSteps = [];
+    for (const item of recipeObj.recipeInstructions) {
+      if (typeof item === 'string') {
+        rawSteps.push(item);
+      } else if (item?.text) {
+        rawSteps.push(item.text);
+      } else if (Array.isArray(item?.itemListElement)) {
+        for (const subItem of item.itemListElement) {
+          if (typeof subItem === 'string') rawSteps.push(subItem);
+          else if (subItem?.text) rawSteps.push(subItem.text);
+        }
+      }
+    }
+    method = rawSteps.map((s) => decodeHtmlEntities(s)
+      .replace(/^Step\s*\d+:\s*/i, '')
+      .replace(/^\d+\.\s*/, '')
+      .replace(/Recipe developed by.*/i, '')
+      .replace(/Recipe adapted from.*/i, '')
+      .trim()
+    ).filter(Boolean).slice(0, 6);
   }
 
   if (ingredients.length === 0) {

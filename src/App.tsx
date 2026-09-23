@@ -116,7 +116,7 @@ const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
   inboundListenerEnabled: true
 };
 
-  const [settingsInitialTab, setSettingsInitialTab] = useState<'buffer' | 'ai' | 'telegram' | 'autopilot'>('ai');
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'buffer' | 'ai' | 'telegram' | 'autopilot' | 'audio'>('ai');
 
   // Telegram Config from localStorage or default pre-loaded
   const [telegramConfig, setTelegramConfig] = useState<TelegramConfig>(() => {

@@ -4,6 +4,7 @@ import { Slide1Hero } from './slides/Slide1Hero';
 import { Slide2RecipeCard } from './slides/Slide2RecipeCard';
 import { Slide3CTA } from './slides/Slide3CTA';
 import { getBrandLogoUrl, DEFAULT_BRAND_LOGO } from '../utils/imageProxy';
+import { selectTrackForRecipe } from '../utils/audioManager';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -58,6 +59,35 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
   const [showOverlay, setShowOverlay] = useState<boolean>(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [touchStart, setTouchStart] = useState<number | null>(null);
+
+  // Matched background soundtrack
+  const matchedTrack = selectTrackForRecipe(recipe?.title || '');
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+
+  const toggleAudio = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!audioRef.current) {
+      audioRef.current = new Audio(matchedTrack.url);
+      audioRef.current.onended = () => setIsAudioPlaying(false);
+    }
+    if (isAudioPlaying) {
+      audioRef.current.pause();
+      setIsAudioPlaying(false);
+    } else {
+      audioRef.current.src = matchedTrack.url;
+      audioRef.current.play().then(() => setIsAudioPlaying(true)).catch(() => {});
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, [recipe?.title]);
 
   // Zoom scale state with localStorage persistence & responsive default
   const [zoomScale, setZoomScale] = useState<number>(() => {
@@ -577,11 +607,44 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
                         {recipe.title.toUpperCase()} — {recipe.shortHook || 'Rich, satisfying, and effortless. Restaurant-quality flavors made right at home.'} {recipe.ingredients.length} ingredients, {recipe.method.length} steps. 🍽️ What you need: {recipe.ingredients.slice(0, 2).map(i => `${i.amount ? i.amount + ' ' : ''}${i.name}`).join(', ')}...<span className="tiktok-more-btn">more</span>
                       </div>
 
-                      {/* Sound Track Row */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#ffffff', fontSize: '0.64rem', fontWeight: 600, opacity: 0.9 }}>
-                        <Music2 size={11} color="#ffffff" />
-                        <span>Contains: Viral Recipe Audio · Original</span>
-                      </div>
+                      {/* Sound Track Row with Interactive Preview */}
+                      <button
+                        type="button"
+                        onClick={toggleAudio}
+                        title="Click to preview culinary background soundtrack"
+                        style={{
+                          background: isAudioPlaying ? 'rgba(245, 158, 11, 0.25)' : 'rgba(0, 0, 0, 0.5)',
+                          backdropFilter: 'blur(8px)',
+                          border: isAudioPlaying ? '1px solid var(--app-accent)' : '1px solid rgba(255, 255, 255, 0.15)',
+                          borderRadius: 20,
+                          padding: '3px 9px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          color: '#ffffff',
+                          fontSize: '0.64rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          width: 'fit-content',
+                          transition: 'all 0.2s ease',
+                          marginTop: 3
+                        }}
+                      >
+                        <Music2 size={11} color="var(--app-accent)" />
+                        <span style={{ maxWidth: 160, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {matchedTrack.title} · Original Sound
+                        </span>
+                        <span style={{
+                          background: isAudioPlaying ? 'var(--app-accent)' : 'rgba(255, 255, 255, 0.2)',
+                          color: isAudioPlaying ? '#000' : '#fff',
+                          padding: '1px 5px',
+                          borderRadius: 10,
+                          fontSize: '0.55rem',
+                          fontWeight: 800
+                        }}>
+                          {isAudioPlaying ? '❚❚ Stop' : '▶ Preview'}
+                        </span>
+                      </button>
 
                       {/* Bottom Add Comment Bar */}
                       <div className="tiktok-comment-bar">

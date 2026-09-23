@@ -1,46 +1,51 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { generateAllStarterTracks } from '../scripts/generate-starter-audio.js';
+import { seedAudioTracks } from '../scripts/seed-audio.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const MUSIC_DIR = path.resolve(__dirname, '../music');
+const PUBLIC_AUDIO_DIR = path.resolve(__dirname, '../public/audio');
 
 export function getAvailableAudioTracks() {
-  if (!fs.existsSync(MUSIC_DIR)) {
-    fs.mkdirSync(MUSIC_DIR, { recursive: true });
+  const targetDir = fs.existsSync(MUSIC_DIR) && fs.readdirSync(MUSIC_DIR).some(f => f.endsWith('.mp3'))
+    ? MUSIC_DIR
+    : PUBLIC_AUDIO_DIR;
+
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
   }
 
-  let files = fs.readdirSync(MUSIC_DIR).filter(f => {
+  let files = fs.readdirSync(targetDir).filter(f => {
     const ext = path.extname(f).toLowerCase();
     return ['.mp3', '.wav', '.m4a', '.aac', '.ogg'].includes(ext);
   });
 
   if (files.length === 0) {
     try {
-      generateAllStarterTracks();
-      files = fs.readdirSync(MUSIC_DIR).filter(f => {
+      seedAudioTracks();
+      files = fs.readdirSync(targetDir).filter(f => {
         const ext = path.extname(f).toLowerCase();
         return ['.mp3', '.wav', '.m4a', '.aac', '.ogg'].includes(ext);
       });
     } catch (e) {
-      console.warn('[AudioManager] Could not auto-generate starter tracks:', e.message);
+      console.warn('[AudioManager] Could not auto-seed tracks:', e.message);
     }
   }
 
   return files.map(f => ({
     filename: f,
-    filepath: path.join(MUSIC_DIR, f),
+    filepath: path.join(targetDir, f),
     vibe: detectVibe(f)
   }));
 }
 
 function detectVibe(filename) {
   const lower = filename.toLowerCase();
-  if (lower.includes('lofi') || lower.includes('chill') || lower.includes('mellow')) return 'lofi';
-  if (lower.includes('acoustic') || lower.includes('coffee') || lower.includes('guitar')) return 'acoustic';
-  if (lower.includes('upbeat') || lower.includes('groove') || lower.includes('dance') || lower.includes('pop')) return 'upbeat';
+  if (lower.includes('lofi') || lower.includes('chill') || lower.includes('mellow') || lower.includes('lounge') || lower.includes('brunch')) return 'lofi';
+  if (lower.includes('acoustic') || lower.includes('coffee') || lower.includes('guitar') || lower.includes('bistro') || lower.includes('italian')) return 'acoustic';
+  if (lower.includes('upbeat') || lower.includes('groove') || lower.includes('dance') || lower.includes('pop') || lower.includes('cheery')) return 'upbeat';
   return 'general';
 }
 
