@@ -1,5 +1,5 @@
 export interface AudioVibeOption {
-  id: 'lofi' | 'acoustic' | 'upbeat' | 'auto';
+  id: 'lofi' | 'acoustic' | 'upbeat' | 'auto' | 'none';
   name: string;
   description: string;
   emoji: string;
@@ -29,6 +29,12 @@ export const AUDIO_VIBE_PRESETS: AudioVibeOption[] = [
     name: 'Auto-Rotate / Smart Shuffle',
     description: 'Picks the best culinary soundtrack matching your recipe tone',
     emoji: '🎲'
+  },
+  {
+    id: 'none',
+    name: 'Silent / No Audio (Add in TikTok)',
+    description: 'Renders video with silence so you can attach trending TikTok sounds in-app',
+    emoji: '🔇'
   }
 ];
 
@@ -39,71 +45,80 @@ export interface AudioTrackInfo {
   vibe: 'lofi' | 'acoustic' | 'upbeat' | 'general';
   description: string;
   url: string;
+  license?: string;
 }
 
 export const DEFAULT_FOOD_TRACKS: AudioTrackInfo[] = [
   {
     id: 'lofi-kitchen-chill',
     filename: 'lofi-kitchen-chill.mp3',
-    title: 'Cozy Kitchen Bossa',
+    title: 'Butter and Windowlight',
     vibe: 'lofi',
-    description: 'Mellow bossa nova rhythms, warm chords, relaxed cooking mood',
+    description: 'Mellow, relaxed chords and warm vintage vibes for baking & comfort food',
+    license: 'CC0 1.0 Universal (Public Domain)',
     url: '/audio/lofi-kitchen-chill.mp3'
+  },
+  {
+    id: 'lofi-chill-vibes',
+    filename: 'lofi-chill-vibes.mp3',
+    title: 'Pancakes in the Sun',
+    vibe: 'lofi',
+    description: 'Soft chillhop chords with deep relaxing morning warmth',
+    license: 'CC0 1.0 Universal (Public Domain)',
+    url: '/audio/lofi-chill-vibes.mp3'
   },
   {
     id: 'lofi-cocktail-lounge',
     filename: 'lofi-cocktail-lounge.mp3',
-    title: 'Airport Lounge Chill',
+    title: 'Linen and Limoncello',
     vibe: 'lofi',
-    description: 'Smooth vibraphone and jazz keys, ideal for dinner dates and steak recipes',
+    description: 'Smooth jazz keys and mellow groove, ideal for dinner & steak recipes',
+    license: 'CC0 1.0 Universal (Public Domain)',
     url: '/audio/lofi-cocktail-lounge.mp3'
   },
   {
     id: 'lofi-jazz-brunch',
     filename: 'lofi-jazz-brunch.mp3',
-    title: 'Sunday Jazz Brunch',
+    title: 'First Coffee Thoughts',
     vibe: 'lofi',
     description: 'Warm, relaxed, cozy Sunday morning kitchen groove with mellow guitar',
+    license: 'CC0 1.0 Universal (Public Domain)',
     url: '/audio/lofi-jazz-brunch.mp3'
-  },
-  {
-    id: 'lofi-chill-vibes',
-    filename: 'lofi-chill-vibes.mp3',
-    title: 'Cozy Kitchen Chill Vibes',
-    vibe: 'lofi',
-    description: 'Soft slow jazz trio chords with deep relaxing warmth',
-    url: '/audio/lofi-chill-vibes.mp3'
   },
   {
     id: 'acoustic-morning-cafe',
     filename: 'acoustic-morning-cafe.mp3',
-    title: 'Carefree Morning Cafe',
+    title: 'Barefoot in the Kitchen',
     vibe: 'acoustic',
-    description: 'Warm acoustic guitar, cheerful whistling, bright breakfast vibe',
+    description: 'Warm acoustic morning texture and cheerful groove for breakfast & brunch',
+    license: 'CC0 1.0 Universal (Public Domain)',
     url: '/audio/acoustic-morning-cafe.mp3'
   },
   {
     id: 'italian-bistro-vibes',
     filename: 'italian-bistro-vibes.mp3',
-    title: 'Bushwick Tarantella Bistro',
+    title: 'Coffee Ring Notebook',
     vibe: 'acoustic',
-    description: 'Italian accordion and mandolin, perfect for pasta and pizza reels',
+    description: 'Cozy acoustic cafe vibes, perfect for pasta, pizza and comfort reels',
+    license: 'CC0 1.0 Universal (Public Domain)',
     url: '/audio/italian-bistro-vibes.mp3'
   },
   {
     id: 'upbeat-cooking-groove',
     filename: 'upbeat-cooking-groove.mp3',
-    title: 'Life of Riley Foodie',
+    title: 'Golden Afternoon Groove',
     vibe: 'upbeat',
     description: 'Upbeat lively acoustic groove, snappy tempo for fast recipe edits',
+    license: 'CC0 1.0 Universal (Public Domain)',
     url: '/audio/upbeat-cooking-groove.mp3'
   },
   {
     id: 'upbeat-cheery-kitchen',
     filename: 'upbeat-cheery-kitchen.mp3',
-    title: 'Cheery Monday Culinary',
+    title: 'Grandmas Kitchen on Sunday',
     vibe: 'upbeat',
-    description: 'Bright pop-acoustic energy for quick meal prep and baking',
+    description: 'Bright culinary bounce and family kitchen warmth for quick meal prep',
+    license: 'CC0 1.0 Universal (Public Domain)',
     url: '/audio/upbeat-cheery-kitchen.mp3'
   }
 ];
@@ -111,11 +126,11 @@ export const DEFAULT_FOOD_TRACKS: AudioTrackInfo[] = [
 /**
  * Get user's preferred audio vibe from localStorage (defaults to 'lofi')
  */
-export function getPreferredAudioVibe(): 'lofi' | 'acoustic' | 'upbeat' | 'auto' {
+export function getPreferredAudioVibe(): 'lofi' | 'acoustic' | 'upbeat' | 'auto' | 'none' {
   if (typeof window !== 'undefined') {
     try {
       const saved = localStorage.getItem('slyde_preferred_audio_vibe');
-      if (saved === 'lofi' || saved === 'acoustic' || saved === 'upbeat' || saved === 'auto') {
+      if (saved === 'lofi' || saved === 'acoustic' || saved === 'upbeat' || saved === 'auto' || saved === 'none') {
         return saved;
       }
     } catch (e) {}
@@ -126,7 +141,7 @@ export function getPreferredAudioVibe(): 'lofi' | 'acoustic' | 'upbeat' | 'auto'
 /**
  * Save user's preferred audio vibe to localStorage
  */
-export function setPreferredAudioVibe(vibe: 'lofi' | 'acoustic' | 'upbeat' | 'auto'): void {
+export function setPreferredAudioVibe(vibe: 'lofi' | 'acoustic' | 'upbeat' | 'auto' | 'none'): void {
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem('slyde_preferred_audio_vibe', vibe);
@@ -168,9 +183,15 @@ export function selectTrackForRecipe(
   recipeTitle: string = '',
   preferredVibe?: string,
   availableTracks: AudioTrackInfo[] = DEFAULT_FOOD_TRACKS
-): AudioTrackInfo {
-  const tracks = availableTracks.length > 0 ? availableTracks : DEFAULT_FOOD_TRACKS;
+): AudioTrackInfo | null {
   const effectiveVibe = (preferredVibe || getPreferredAudioVibe()).toLowerCase();
+
+  // If user selected silent / no audio
+  if (effectiveVibe === 'none' || effectiveVibe === 'silent') {
+    return null;
+  }
+
+  const tracks = availableTracks.length > 0 ? availableTracks : DEFAULT_FOOD_TRACKS;
 
   // If specific vibe requested (e.g. lofi, acoustic, upbeat)
   if (effectiveVibe !== 'auto' && effectiveVibe !== 'shuffle') {

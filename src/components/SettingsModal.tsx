@@ -84,7 +84,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [autoPilotForm, setAutoPilotForm] = useState<AutoPilotConfig>(autoPilotConfig);
 
   // Audio Settings State (Defaults to Lo-Fi)
-  const [preferredVibe, setPreferredVibeState] = useState<'lofi' | 'acoustic' | 'upbeat' | 'auto'>(() => getPreferredAudioVibe());
+  const [preferredVibe, setPreferredVibeState] = useState<'lofi' | 'acoustic' | 'upbeat' | 'auto' | 'none'>(() => getPreferredAudioVibe());
   const [audioTracksList, setAudioTracksList] = useState<AudioTrackInfo[]>(DEFAULT_FOOD_TRACKS);
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const settingsAudioRef = React.useRef<HTMLAudioElement | null>(null);

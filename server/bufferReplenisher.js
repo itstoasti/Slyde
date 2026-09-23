@@ -444,26 +444,39 @@ async function generateVideoUniversal(buf1, buf2, buf3, audioVibe = 'lofi') {
 
     fs.writeFileSync(concatPath, clips.map(c => `file '${c.output}'`).join('\n'));
 
-    // Audio soundtrack lookup
+    // Audio soundtrack lookup (skip if user requested silent/none)
     let audioTrackPath = null;
-    const searchDirs = [
-      path.resolve(ROOT_DIR, 'public/audio'),
-      path.resolve(ROOT_DIR, 'music')
-    ];
-    for (const d of searchDirs) {
-      if (fs.existsSync(d)) {
-        const mp3s = fs.readdirSync(d).filter(f => f.endsWith('.mp3'));
-        const lofiMatch = mp3s.find(f => f.includes(audioVibe)) || mp3s.find(f => f.includes('lofi')) || mp3s[0];
-        if (lofiMatch) {
-          audioTrackPath = path.join(d, lofiMatch);
-          break;
+    const cleanVibe = (audioVibe || 'lofi').toLowerCase();
+
+    if (cleanVibe !== 'none' && cleanVibe !== 'silent') {
+      const searchDirs = [
+        path.resolve(ROOT_DIR, 'public/audio'),
+        path.resolve(ROOT_DIR, 'music')
+      ];
+      for (const d of searchDirs) {
+        if (fs.existsSync(d)) {
+          const mp3s = fs.readdirSync(d).filter(f => f.endsWith('.mp3'));
+          const lofiMatch = mp3s.find(f => f.includes(cleanVibe)) || mp3s.find(f => f.includes('lofi')) || mp3s[0];
+          if (lofiMatch) {
+            audioTrackPath = path.join(d, lofiMatch);
+            break;
+          }
         }
       }
     }
 
     const ffmpegArgs = ['-y', '-f', 'concat', '-safe', '0', '-i', concatPath];
     if (audioTrackPath && fs.existsSync(audioTrackPath)) {
-      ffmpegArgs.push('-stream_loop', '-1', '-i', audioTrackPath, '-t', '9.0', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '128k', '-shortest');
+      ffmpegArgs.push(
+        '-stream_loop', '-1',
+        '-i', audioTrackPath,
+        '-t', '9.0',
+        '-c:v', 'copy',
+        '-c:a', 'aac',
+        '-b:a', '192k',
+        '-af', 'afade=t=in:ss=0:d=0.25,afade=t=out:st=8.0:d=1.0',
+        '-shortest'
+      );
     } else {
       ffmpegArgs.push('-t', '9.0', '-c:v', 'copy');
     }

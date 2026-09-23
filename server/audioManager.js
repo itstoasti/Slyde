@@ -56,10 +56,13 @@ function detectVibe(filename) {
  * @returns {string|null} - Absolute path to audio track
  */
 export function selectAudioTrack(recipeTitle = '', preferredVibe = 'auto') {
+  const cleanVibe = (preferredVibe || 'auto').toLowerCase();
+  if (cleanVibe === 'none' || cleanVibe === 'silent') {
+    return null;
+  }
+
   const tracks = getAvailableAudioTracks();
   if (tracks.length === 0) return null;
-
-  const cleanVibe = (preferredVibe || 'auto').toLowerCase();
 
   if (cleanVibe !== 'auto' && cleanVibe !== 'shuffle') {
     const matched = tracks.filter(t => t.vibe === cleanVibe);

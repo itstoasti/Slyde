@@ -2,81 +2,73 @@
   {
     "id": "lofi-kitchen-chill",
     "filename": "lofi-kitchen-chill.mp3",
-    "title": "Cozy Kitchen Bossa",
+    "title": "Butter and Windowlight",
     "vibe": "lofi",
-    "description": "Mellow bossa nova rhythms, warm chords, relaxed cooking mood",
-    "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Bossa%20Antigua.mp3",
-    "startTime": "00:00:04",
-    "duration": 12
-  },
-  {
-    "id": "acoustic-morning-cafe",
-    "filename": "acoustic-morning-cafe.mp3",
-    "title": "Carefree Morning Cafe",
-    "vibe": "acoustic",
-    "description": "Warm acoustic guitar, cheerful whistling, bright breakfast vibe",
-    "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Carefree.mp3",
-    "startTime": "00:00:02",
-    "duration": 12
-  },
-  {
-    "id": "upbeat-cooking-groove",
-    "filename": "upbeat-cooking-groove.mp3",
-    "title": "Life of Riley Foodie",
-    "vibe": "upbeat",
-    "description": "Upbeat lively acoustic groove, snappy tempo for fast recipe edits",
-    "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Life%20of%20Riley.mp3",
-    "startTime": "00:00:00",
-    "duration": 12
-  },
-  {
-    "id": "italian-bistro-vibes",
-    "filename": "italian-bistro-vibes.mp3",
-    "title": "Bushwick Tarantella Bistro",
-    "vibe": "acoustic",
-    "description": "Italian accordion and mandolin, perfect for pasta and pizza reels",
-    "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Bushwick%20Tarantella.mp3",
-    "startTime": "00:00:02",
-    "duration": 12
-  },
-  {
-    "id": "lofi-cocktail-lounge",
-    "filename": "lofi-cocktail-lounge.mp3",
-    "title": "Airport Lounge Chill",
-    "vibe": "lofi",
-    "description": "Smooth vibraphone and jazz keys, ideal for dinner dates and steak recipes",
-    "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Airport%20Lounge.mp3",
-    "startTime": "00:00:03",
-    "duration": 12
-  },
-  {
-    "id": "lofi-jazz-brunch",
-    "filename": "lofi-jazz-brunch.mp3",
-    "title": "Sunday Jazz Brunch",
-    "vibe": "lofi",
-    "description": "Warm, relaxed, cozy Sunday morning kitchen groove with mellow guitar",
-    "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Jazz%20Brunch.mp3",
-    "startTime": "00:00:03",
-    "duration": 12
+    "description": "Mellow, relaxed chords and warm vintage vibes for baking & comfort food",
+    "license": "CC0 1.0 Universal (Public Domain)",
+    "duration": 30
   },
   {
     "id": "lofi-chill-vibes",
     "filename": "lofi-chill-vibes.mp3",
-    "title": "Cozy Kitchen Chill Vibes",
+    "title": "Pancakes in the Sun",
     "vibe": "lofi",
-    "description": "Soft slow jazz trio chords with deep relaxing warmth",
-    "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Cool%20Vibes.mp3",
-    "startTime": "00:00:02",
-    "duration": 12
+    "description": "Soft chillhop chords with deep relaxing morning warmth",
+    "license": "CC0 1.0 Universal (Public Domain)",
+    "duration": 30
+  },
+  {
+    "id": "lofi-cocktail-lounge",
+    "filename": "lofi-cocktail-lounge.mp3",
+    "title": "Linen and Limoncello",
+    "vibe": "lofi",
+    "description": "Smooth jazz keys and mellow groove, ideal for dinner & steak recipes",
+    "license": "CC0 1.0 Universal (Public Domain)",
+    "duration": 30
+  },
+  {
+    "id": "lofi-jazz-brunch",
+    "filename": "lofi-jazz-brunch.mp3",
+    "title": "First Coffee Thoughts",
+    "vibe": "lofi",
+    "description": "Warm, relaxed, cozy Sunday morning kitchen groove with mellow guitar",
+    "license": "CC0 1.0 Universal (Public Domain)",
+    "duration": 30
+  },
+  {
+    "id": "acoustic-morning-cafe",
+    "filename": "acoustic-morning-cafe.mp3",
+    "title": "Barefoot in the Kitchen",
+    "vibe": "acoustic",
+    "description": "Warm acoustic morning texture and cheerful groove for breakfast & brunch",
+    "license": "CC0 1.0 Universal (Public Domain)",
+    "duration": 30
+  },
+  {
+    "id": "italian-bistro-vibes",
+    "filename": "italian-bistro-vibes.mp3",
+    "title": "Coffee Ring Notebook",
+    "vibe": "acoustic",
+    "description": "Cozy acoustic cafe vibes, perfect for pasta, pizza and comfort reels",
+    "license": "CC0 1.0 Universal (Public Domain)",
+    "duration": 30
+  },
+  {
+    "id": "upbeat-cooking-groove",
+    "filename": "upbeat-cooking-groove.mp3",
+    "title": "Golden Afternoon Groove",
+    "vibe": "upbeat",
+    "description": "Upbeat lively acoustic groove, snappy tempo for fast recipe edits",
+    "license": "CC0 1.0 Universal (Public Domain)",
+    "duration": 30
   },
   {
     "id": "upbeat-cheery-kitchen",
     "filename": "upbeat-cheery-kitchen.mp3",
-    "title": "Cheery Monday Culinary",
+    "title": "Grandmas Kitchen on Sunday",
     "vibe": "upbeat",
-    "description": "Bright pop-acoustic energy for quick meal prep and baking",
-    "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Cheery%20Monday.mp3",
-    "startTime": "00:00:00",
-    "duration": 12
+    "description": "Bright culinary bounce and family kitchen warmth for quick meal prep",
+    "license": "CC0 1.0 Universal (Public Domain)",
+    "duration": 30
   }
 ]

@@ -67,6 +67,7 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
 
   const toggleAudio = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!matchedTrack) return;
     if (!audioRef.current) {
       audioRef.current = new Audio(matchedTrack.url);
       audioRef.current.onended = () => setIsAudioPlaying(false);
@@ -632,18 +633,20 @@ export const PhoneSimulator: React.FC<PhoneSimulatorProps> = ({
                       >
                         <Music2 size={11} color="var(--app-accent)" />
                         <span style={{ maxWidth: 160, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {matchedTrack.title} · Original Sound
+                          {matchedTrack ? `${matchedTrack.title} · CC0 Sound` : '🔇 Silent (Add in TikTok)'}
                         </span>
-                        <span style={{
-                          background: isAudioPlaying ? 'var(--app-accent)' : 'rgba(255, 255, 255, 0.2)',
-                          color: isAudioPlaying ? '#000' : '#fff',
-                          padding: '1px 5px',
-                          borderRadius: 10,
-                          fontSize: '0.55rem',
-                          fontWeight: 800
-                        }}>
-                          {isAudioPlaying ? '❚❚ Stop' : '▶ Preview'}
-                        </span>
+                        {matchedTrack && (
+                          <span style={{
+                            background: isAudioPlaying ? 'var(--app-accent)' : 'rgba(255, 255, 255, 0.2)',
+                            color: isAudioPlaying ? '#000' : '#fff',
+                            padding: '1px 5px',
+                            borderRadius: 10,
+                            fontSize: '0.55rem',
+                            fontWeight: 800
+                          }}>
+                            {isAudioPlaying ? '❚❚ Stop' : '▶ Preview'}
+                          </span>
+                        )}
                       </button>
 
                       {/* Bottom Add Comment Bar */}

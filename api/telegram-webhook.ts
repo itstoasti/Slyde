@@ -640,52 +640,55 @@ async function generateVideoFromSlideBuffers(
     // Write concat list
     fs.writeFileSync(concatPath, clips.map(c => `file '${c.output}'`).join('\n'));
 
-    // Check for background culinary soundtrack (prioritizing Lo-Fi)
-    const audioDirs = [
-      path.resolve(process.cwd(), 'public/audio'),
-      path.resolve(process.cwd(), 'music')
-    ];
-    for (const d of audioDirs) {
-      if (fs.existsSync(d)) {
-        const mp3s = fs.readdirSync(d).filter(f => f.endsWith('.mp3'));
-        if (mp3s.length > 0) {
-          const lofiTracks = mp3s.filter(f => f.includes('lofi') || f.includes('chill') || f.includes('lounge') || f.includes('brunch'));
-          let candidateList = mp3s;
-          if (audioVibe === 'lofi' && lofiTracks.length > 0) {
-            candidateList = lofiTracks;
-          } else if (audioVibe === 'acoustic') {
-            const acousticTracks = mp3s.filter(f => f.includes('acoustic') || f.includes('bistro'));
-            candidateList = acousticTracks.length > 0 ? acousticTracks : mp3s;
-          } else if (audioVibe === 'upbeat') {
-            const upbeatTracks = mp3s.filter(f => f.includes('upbeat') || f.includes('cheery'));
-            candidateList = upbeatTracks.length > 0 ? upbeatTracks : mp3s;
-          } else if (lofiTracks.length > 0) {
-            candidateList = lofiTracks; // Default fallback to Lo-Fi
+    // Check for background culinary soundtrack (prioritizing CC0 Lo-Fi, skip if silent)
+    const cleanVibe = (audioVibe || 'lofi').toLowerCase();
+    if (cleanVibe !== 'none' && cleanVibe !== 'silent') {
+      const audioDirs = [
+        path.resolve(process.cwd(), 'public/audio'),
+        path.resolve(process.cwd(), 'music')
+      ];
+      for (const d of audioDirs) {
+        if (fs.existsSync(d)) {
+          const mp3s = fs.readdirSync(d).filter(f => f.endsWith('.mp3'));
+          if (mp3s.length > 0) {
+            const lofiTracks = mp3s.filter(f => f.includes('lofi') || f.includes('chill') || f.includes('lounge') || f.includes('brunch'));
+            let candidateList = mp3s;
+            if (cleanVibe === 'lofi' && lofiTracks.length > 0) {
+              candidateList = lofiTracks;
+            } else if (cleanVibe === 'acoustic') {
+              const acousticTracks = mp3s.filter(f => f.includes('acoustic') || f.includes('bistro'));
+              candidateList = acousticTracks.length > 0 ? acousticTracks : mp3s;
+            } else if (cleanVibe === 'upbeat') {
+              const upbeatTracks = mp3s.filter(f => f.includes('upbeat') || f.includes('cheery'));
+              candidateList = upbeatTracks.length > 0 ? upbeatTracks : mp3s;
+            } else if (lofiTracks.length > 0) {
+              candidateList = lofiTracks; // Default fallback to Lo-Fi
+            }
+            const hash = Math.abs((recipeTitle || 'lofi-recipe').split('').reduce((acc, c) => ((acc << 5) - acc) + c.charCodeAt(0), 0));
+            audioTrackPath = path.join(d, candidateList[hash % candidateList.length]);
+            break;
           }
-          const hash = Math.abs((recipeTitle || 'lofi-recipe').split('').reduce((acc, c) => ((acc << 5) - acc) + c.charCodeAt(0), 0));
-          audioTrackPath = path.join(d, candidateList[hash % candidateList.length]);
-          break;
         }
       }
-    }
 
-    // If audio track is not found on serverless local disk, fetch directly from Vercel static URL
-    if (!audioTrackPath && host) {
-      try {
-        const cleanHost = host.replace(/^https?:\/\//, '');
-        const targetTrack = 'lofi-kitchen-chill.mp3';
-        const audioUrl = cleanHost.includes('localhost')
-          ? `http://${cleanHost}/audio/${targetTrack}`
-          : `https://${cleanHost}/audio/${targetTrack}`;
-        const audioRes = await fetch(audioUrl);
-        if (audioRes.ok) {
-          const arrayBuf = await audioRes.arrayBuffer();
-          const tmpAudio = path.join(tmpDir, `audio_${Date.now()}.mp3`);
-          fs.writeFileSync(tmpAudio, Buffer.from(arrayBuf));
-          audioTrackPath = tmpAudio;
+      // If audio track is not found on serverless local disk, fetch directly from Vercel static URL
+      if (!audioTrackPath && host) {
+        try {
+          const cleanHost = host.replace(/^https?:\/\//, '');
+          const targetTrack = 'lofi-kitchen-chill.mp3';
+          const audioUrl = cleanHost.includes('localhost')
+            ? `http://${cleanHost}/audio/${targetTrack}`
+            : `https://${cleanHost}/audio/${targetTrack}`;
+          const audioRes = await fetch(audioUrl);
+          if (audioRes.ok) {
+            const arrayBuf = await audioRes.arrayBuffer();
+            const tmpAudio = path.join(tmpDir, `audio_${Date.now()}.mp3`);
+            fs.writeFileSync(tmpAudio, Buffer.from(arrayBuf));
+            audioTrackPath = tmpAudio;
+          }
+        } catch (e) {
+          console.warn('Failed to fetch remote audio track fallback:', e);
         }
-      } catch (e) {
-        console.warn('Failed to fetch remote audio track fallback:', e);
       }
     }
 
@@ -972,7 +975,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const ratioLabel = ratio === '1:1' ? '1:1 Square' : (ratio === '4:5' ? '4:5 Portrait' : '9:16 Vertical');
-    const actionLabel = format === 'video' ? '🎬 9.0s Video' : (format === 'slides' ? `📸 3 ${ratioLabel} Slides` : (format === 'caption' ? '📋 Viral Caption' : `⚡ Video + 3 Slides (${ratioLabel})`));
+    const actionLabel = format === 'video' ? '🎬 9.0s Video (CC0 Lo-Fi)' : (format === 'silentvid' ? '🔇 9.0s Video (Silent)' : (format === 'slides' ? `📸 3 ${ratioLabel} Slides` : (format === 'caption' ? '📋 Viral Caption' : `⚡ Video + 3 Slides (${ratioLabel})`)));
 
     await answerTelegramCallbackQuery(botToken, cbId, `Generating ${actionLabel}...`);
 
@@ -1022,10 +1025,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return;
         }
 
-        const needsVideo = format === 'video' || format === 'all';
+        const needsVideo = format === 'video' || format === 'silentvid' || format === 'all';
         const needsSlides = format === 'slides' || format === 'all';
+        const callbackVibe = format === 'silentvid' ? 'none' : 'lofi';
 
-        const media = await captureMediaServerless(recipe, host, needsVideo, ratio, 'lofi');
+        const media = await captureMediaServerless(recipe, host, needsVideo, ratio, callbackVibe);
 
         if (needsVideo) {
           if (media.videoBuffer) {
@@ -1261,8 +1265,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             { text: '📸 1:1 Square Slides', callback_data: `slyde:${shortId}:slides:1-1` }
           ],
           [
-            { text: '📸 4:5 Portrait Slides', callback_data: `slyde:${shortId}:slides:4-5` },
-            { text: '🎥 9s Video (9:16)', callback_data: `slyde:${shortId}:video:9-16` }
+            { text: '🎥 9s Video (CC0 Audio)', callback_data: `slyde:${shortId}:video:9-16` },
+            { text: '🔇 9s Video (Silent)', callback_data: `slyde:${shortId}:silentvid:9-16` }
           ],
           [
             { text: '⚡ Video + Slides + Caption', callback_data: `slyde:${shortId}:all:9-16` },
@@ -1296,13 +1300,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       requestedAspectRatio = '9:16';
     }
 
-    const isVideoOnly = lowerText.startsWith('/video') || lowerText.startsWith('/short') || lowerText.startsWith('/reel') || lowerText.startsWith('/v ') || lowerText.startsWith('/lofi');
+    const isVideoOnly = lowerText.startsWith('/video') || lowerText.startsWith('/short') || lowerText.startsWith('/reel') || lowerText.startsWith('/v ') || lowerText.startsWith('/lofi') || lowerText.startsWith('/silent');
     const isSlidesOnly = lowerText.startsWith('/slides') || lowerText.startsWith('/slide') || lowerText.startsWith('/carousel') || lowerText.startsWith('/album') || lowerText.startsWith('/s ') || lowerText.startsWith('/square') || lowerText.startsWith('/sq') || lowerText.startsWith('/portrait');
     const isCaptionOnly = lowerText.startsWith('/caption') || lowerText.startsWith('/c ');
-    const requestedVibe = lowerText.includes('acoustic') ? 'acoustic' : (lowerText.includes('upbeat') ? 'upbeat' : 'lofi');
+    const requestedVibe = (lowerText.includes('silent') || lowerText.includes('mute') || lowerText.includes('none') || lowerText.startsWith('/silent'))
+      ? 'none'
+      : (lowerText.includes('acoustic') ? 'acoustic' : (lowerText.includes('upbeat') ? 'upbeat' : 'lofi'));
 
     const ratioLabel = requestedAspectRatio === '1:1' ? ' [1:1 Square]' : (requestedAspectRatio === '4:5' ? ' [4:5 Portrait]' : ' [9:16 Vertical]');
-    const modeText = isVideoOnly ? '🎬 9.0s Video (Cozy Lo-Fi)' : (isSlidesOnly ? `📸 3 Social Slides${ratioLabel}` : `⚡ 9.0s Video + 3 Slides${ratioLabel}`);
+    const modeText = isVideoOnly 
+      ? (requestedVibe === 'none' ? '🎬 9.0s Video (Silent)' : '🎬 9.0s Video (CC0 Lo-Fi)')
+      : (isSlidesOnly ? `📸 3 Social Slides${ratioLabel}` : `⚡ 9.0s Video + 3 Slides${ratioLabel}`);
 
     // Run processing asynchronously with Vercel waitUntil and return 200 OK immediately
     waitUntil((async () => {

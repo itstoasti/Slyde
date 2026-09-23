@@ -71,9 +71,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
 
   // Background Audio State (Defaults to user preference, e.g. 'lofi')
-  const [selectedVibe, setSelectedVibe] = useState<'lofi' | 'acoustic' | 'upbeat' | 'auto'>(() => getPreferredAudioVibe());
+  const [selectedVibe, setSelectedVibe] = useState<'lofi' | 'acoustic' | 'upbeat' | 'auto' | 'none'>(() => getPreferredAudioVibe());
   const [audioTracks, setAudioTracks] = useState<AudioTrackInfo[]>(DEFAULT_FOOD_TRACKS);
-  const [activeAudioTrack, setActiveAudioTrack] = useState<AudioTrackInfo>(() => selectTrackForRecipe(recipe?.title || '', getPreferredAudioVibe()));
+  const [activeAudioTrack, setActiveAudioTrack] = useState<AudioTrackInfo | null>(() => selectTrackForRecipe(recipe?.title || '', getPreferredAudioVibe()));
   const [isPlayingPreview, setIsPlayingPreview] = useState(false);
   const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
 
@@ -85,15 +85,20 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       setActiveAudioTrack(picked);
       if (audioPreviewRef.current && isPlayingPreview) {
         audioPreviewRef.current.pause();
-        audioPreviewRef.current.src = picked.url;
-        audioPreviewRef.current.play().catch(() => {});
+        if (picked) {
+          audioPreviewRef.current.src = picked.url;
+          audioPreviewRef.current.play().catch(() => {});
+        } else {
+          setIsPlayingPreview(false);
+        }
       }
     });
   }, [isOpen, recipe?.title, selectedVibe]);
 
   // Audio preview toggle
   const toggleAudioPreview = () => {
-    if (!audioPreviewRef.current && activeAudioTrack) {
+    if (!activeAudioTrack) return;
+    if (!audioPreviewRef.current) {
       audioPreviewRef.current = new Audio(activeAudioTrack.url);
       audioPreviewRef.current.onended = () => setIsPlayingPreview(false);
     }
@@ -247,7 +252,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     setIsExportingVideo(true);
     setVideoProgress(5);
     try {
-      const track = activeAudioTrack || selectTrackForRecipe(recipe.title, selectedVibe, audioTracks);
+      const track = selectedVibe === 'none' ? null : (activeAudioTrack || selectTrackForRecipe(recipe.title, selectedVibe, audioTracks));
       const blob = await createSlideshowVideo(
         elements, 
         [2.5, 5.0, 1.5], 
@@ -457,8 +462,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         }
 
         // Always render and upload the 60 FPS video whenever slides are exported
-        setBufferStatus({ loading: true, message: '🎬 Rendering 60 FPS video for YouTube Shorts...' });
-        const videoBlob = await createSlideshowVideo(elements, [2.0, 3.5, 1.5]);
+        setBufferStatus({ loading: true, message: '🎬 Rendering 60 FPS video (CC0 Audio)...' });
+        const bufferTrack = selectedVibe === 'none' ? null : (activeAudioTrack || selectTrackForRecipe(recipe.title, selectedVibe, audioTracks));
+        const videoBlob = await createSlideshowVideo(elements, [2.0, 3.5, 1.5], undefined, bufferTrack?.url);
         const videoExt = videoBlob.type.includes('mp4') ? 'mp4' : 'webm';
         console.log(`[Slyde] Video blob: ${(videoBlob.size / (1024 * 1024)).toFixed(2)}MB, type=${videoBlob.type}`);
         setBufferStatus({ loading: true, message: '🚀 Uploading video for YouTube Studio...' });
@@ -1063,34 +1069,36 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden' }}>
                           <Music size={11} color="var(--app-accent)" />
                           <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#f3f4f6', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {activeAudioTrack?.title || 'Cozy Kitchen Track'}
+                            {activeAudioTrack ? `${activeAudioTrack.title} (CC0)` : (selectedVibe === 'none' ? '🔇 Silent / No Audio' : 'Cozy Kitchen Track')}
                           </span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={toggleAudioPreview}
-                          style={{
-                            background: isPlayingPreview ? 'var(--app-accent)' : 'rgba(255,255,255,0.08)',
-                            color: isPlayingPreview ? '#000' : '#fff',
-                            border: 'none',
-                            borderRadius: 4,
-                            padding: '2px 6px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 3,
-                            fontSize: '0.62rem',
-                            fontWeight: 700
-                          }}
-                        >
-                          {isPlayingPreview ? <Pause size={9} /> : <Play size={9} />}
-                          <span>{isPlayingPreview ? 'Stop' : 'Listen'}</span>
-                        </button>
+                        {activeAudioTrack && (
+                          <button
+                            type="button"
+                            onClick={toggleAudioPreview}
+                            style={{
+                              background: isPlayingPreview ? 'var(--app-accent)' : 'rgba(255,255,255,0.08)',
+                              color: isPlayingPreview ? '#000' : '#fff',
+                              border: 'none',
+                              borderRadius: 4,
+                              padding: '2px 6px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 3,
+                              fontSize: '0.62rem',
+                              fontWeight: 700
+                            }}
+                          >
+                            {isPlayingPreview ? <Pause size={9} /> : <Play size={9} />}
+                            <span>{isPlayingPreview ? 'Stop' : 'Listen'}</span>
+                          </button>
+                        )}
                       </div>
 
                       {/* Vibe Pills */}
                       <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-                        {(['lofi', 'acoustic', 'upbeat', 'auto'] as const).map((v) => (
+                        {(['lofi', 'acoustic', 'upbeat', 'auto', 'none'] as const).map((v) => (
                           <button
                             key={v}
                             type="button"
@@ -1110,7 +1118,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                               cursor: 'pointer'
                             }}
                           >
-                            {v === 'lofi' ? '☕ Lo-Fi' : v === 'acoustic' ? '🎸 Cafe' : v === 'upbeat' ? '🍳 Beat' : '🎲 Auto'}
+                            {v === 'lofi' ? '☕ Lo-Fi' : v === 'acoustic' ? '🎸 Cafe' : v === 'upbeat' ? '🍳 Beat' : v === 'none' ? '🔇 Mute' : '🎲 Auto'}
                           </button>
                         ))}
                       </div>
@@ -1132,7 +1140,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                     ) : (
                       <>
                         <Film size={13} />
-                        <span>Generate MP4 (with Audio)</span>
+                        <span>{selectedVibe === 'none' ? 'Generate MP4 (Silent)' : 'Generate MP4 (with CC0 Audio)'}</span>
                       </>
                     )}
                   </button>

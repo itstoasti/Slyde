@@ -46,7 +46,7 @@ export const BulkScheduleModal: React.FC<BulkScheduleModalProps> = ({
 }) => {
   const [urlsText, setUrlsText] = useState('');
   const [preferredTime, setPreferredTime] = useState('11:30');
-  const [musicVibe, setMusicVibe] = useState<'lofi' | 'acoustic' | 'upbeat' | 'auto'>(() => getPreferredAudioVibe());
+  const [musicVibe, setMusicVibe] = useState<'lofi' | 'acoustic' | 'upbeat' | 'auto' | 'none'>(() => getPreferredAudioVibe());
 
   // Buffer state
   const [bufferConfig, setBufferConfig] = useState<BufferConfig>(() => {
