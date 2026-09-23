@@ -995,6 +995,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           recipe.shortHook = hook.replace(/🍽️/g, '').trim();
         }
 
+        if (format === 'reserve') {
+          // Add recipe to Buffer Reserve Queue and auto-top up
+          const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'slyde-bay.vercel.app';
+          // @ts-ignore
+          const { addRecipesToReserve, topUpBufferQueue, getBufferQueueStatus, getReserveQueueStatus } = await import('../server/bufferReplenisher.js');
+          addRecipesToReserve(targetUrl);
+          const topUpRes = await topUpBufferQueue({ host });
+          const bufStatus = await getBufferQueueStatus();
+          const resStatus = getReserveQueueStatus();
+
+          let msg = `📥 <b>Recipe Added to Buffer Reserve!</b>\n\n🍽️ <b>${escapeHtml(targetTitle || recipe.title || 'Recipe')}</b>\n`;
+          if (topUpRes?.scheduledCount > 0) {
+            msg += `🚀 <b>Auto-scheduled to Buffer!</b> (Buffer is now ${bufStatus.totalScheduled}/10 full).\n`;
+          } else {
+            msg += `📊 Buffer is full (10/10). Saved in reserve — will auto-schedule as soon as a slot opens!\n`;
+          }
+          msg += `📦 Reserve inventory: <b>${resStatus.pendingCount}</b> recipe(s) waiting.\n\n<i>✨ Direct API scheduling active.</i>`;
+
+          await sendTelegramMessage(botToken, chatId, messageThreadId, msg);
+          return;
+        }
+
         if (format === 'caption') {
           await sendTelegramMessage(botToken, chatId, messageThreadId, caption);
           return;
@@ -1066,20 +1088,147 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  if (text.startsWith('/start') || text.startsWith('/help')) {
+  const lowerText = text.toLowerCase().trim();
+
+  // 1. HELP / START
+  if (lowerText.startsWith('/start') || lowerText.startsWith('/help')) {
     await sendTelegramMessage(
       botToken,
       chatId,
       messageThreadId,
-      `🎬 <b>Welcome to Slyde Automation Bot!</b>\n\nSend me <b>any recipe URL</b> to choose options via buttons, or use commands directly:\n\n📸 <b>/slides 1:1 &lt;url&gt;</b> — 1:1 Square Carousel (Instagram & Threads)\n📸 <b>/slides 4:5 &lt;url&gt;</b> — 4:5 Portrait Carousel (Instagram Feed)\n📸 <b>/slides 9:16 &lt;url&gt;</b> — 9:16 Vertical Carousel (TikTok & Stories)\n🎥 <b>/video &lt;url&gt;</b> — 9.0s 9:16 Video (YouTube Shorts & Reels)\n⚡ <b>/all &lt;url&gt;</b> (or paste any URL) — Both Video + 3 Slides + Caption\n📋 <b>/caption &lt;url&gt;</b> — Viral Social Caption only\n\n💡 <i>Shortcuts:</i>\n• <code>/slide 1:1 &lt;url&gt;</code> or <code>/square &lt;url&gt;</code>\n• <code>/slide 4:5 &lt;url&gt;</code> or <code>/portrait &lt;url&gt;</code>\n• <code>/slide 9:16 &lt;url&gt;</code> or <code>/slide &lt;url&gt;</code>\n\n🆔 <i>Your Chat ID: <code>${chatId}</code></i>`
+      `🎬 <b>Welcome to Slyde Automation Bot!</b>\n\n` +
+      `<b>⚡ Quick Generation:</b>\n` +
+      `• Send <b>any recipe URL</b> to choose options via buttons\n` +
+      `• <code>/video &lt;url&gt;</code> — 9s Video with Lo-Fi music\n` +
+      `• <code>/slides 9:16 &lt;url&gt;</code> — 3-Slide 9:16 Carousel\n` +
+      `• <code>/slides 1:1 &lt;url&gt;</code> — 3-Slide Square Carousel\n` +
+      `• <code>/all &lt;url&gt;</code> — Video + 3 Slides + Caption\n\n` +
+      `<b>🚀 Buffer Reserve & 10-Post Autopilot:</b>\n` +
+      `• <b>Paste 15–30 recipe links</b> in one message (or <code>/queue &lt;urls...&gt;</code>)\n` +
+      `  <i>Slyde adds them to your reserve, fills Buffer up to 10/10 posts, and auto-refills daily!</i>\n` +
+      `• <code>/buffer</code> or <code>/status</code> — View active Buffer queue & reserve count\n` +
+      `• <code>/topup</code> or <code>/replenish</code> — Fill open Buffer slots immediately\n\n` +
+      `🆔 <i>Your Chat ID: <code>${chatId}</code></i>`
     );
     return res.status(200).send('OK');
   }
 
+  // 2. BUFFER / QUEUE STATUS COMMAND
+  if (lowerText.startsWith('/buffer') || lowerText.startsWith('/status') || lowerText.startsWith('/queue_status')) {
+    try {
+      // @ts-ignore
+      const { getBufferQueueStatus, getReserveQueueStatus } = await import('../server/bufferReplenisher.js');
+      const bufStatus = await getBufferQueueStatus();
+      const resStatus = getReserveQueueStatus();
+
+      const latestDateStr = bufStatus.latestDueAt 
+        ? new Date(bufStatus.latestDueAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+        : 'None scheduled';
+
+      const statusMsg = `📊 <b>Buffer & Reserve Queue Health</b>\n\n` +
+        `🎯 <b>Buffer Active Queue:</b> <b>${bufStatus.totalScheduled}/10</b> posts scheduled\n` +
+        `🔓 <b>Buffer Open Slots:</b> <b>${bufStatus.slotsAvailable}</b> available\n` +
+        `⏰ <b>Latest Scheduled:</b> ${latestDateStr}\n\n` +
+        `📦 <b>Reserve Inventory:</b> <b>${resStatus.pendingCount}</b> recipe(s) waiting\n` +
+        `✅ <b>Total Ingested:</b> ${resStatus.totalCount} recipe(s)\n\n` +
+        `<i>Tip: Paste 15–30 recipe URLs here anytime to refill your monthly reserve queue!</i>`;
+
+      await sendTelegramMessage(botToken, chatId, messageThreadId, statusMsg);
+    } catch (e: any) {
+      await sendTelegramMessage(botToken, chatId, messageThreadId, `⚠️ Could not query Buffer status: ${e.message}`);
+    }
+    return res.status(200).send('OK');
+  }
+
+  // 3. TOP-UP / REPLENISH BUFFER COMMAND
+  if (lowerText.startsWith('/topup') || lowerText.startsWith('/replenish')) {
+    await sendTelegramMessage(botToken, chatId, messageThreadId, `⚡ <b>Checking Buffer queue and refilling open slots from reserve...</b>`);
+    waitUntil((async () => {
+      try {
+        const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'slyde-bay.vercel.app';
+        // @ts-ignore
+        const { topUpBufferQueue } = await import('../server/bufferReplenisher.js');
+        const res = await topUpBufferQueue({ host });
+
+        if (res.scheduledCount > 0) {
+          const list = (res.newlyScheduled || []).map((p: any, i: number) => `  ${i + 1}. <b>${p.title}</b>`).join('\n');
+          await sendTelegramMessage(
+            botToken,
+            chatId,
+            messageThreadId,
+            `🎉 <b>Buffer Queue Top-Up Complete!</b>\n\n` +
+            `✅ Scheduled <b>${res.scheduledCount}</b> new recipe(s) to Buffer!\n` +
+            `📊 Buffer is now <b>${res.totalScheduled}/10</b> full.\n` +
+            `📦 <b>${res.remainingInReserve}</b> recipe(s) remain in reserve.\n\n` +
+            `${list}\n\n` +
+            `<i>✨ Direct automated API publishing — no manual phone reminders needed.</i>`
+          );
+        } else {
+          await sendTelegramMessage(
+            botToken,
+            chatId,
+            messageThreadId,
+            `ℹ️ <b>Buffer Queue Status:</b>\n\n${res.message}`
+          );
+        }
+      } catch (e: any) {
+        await sendTelegramMessage(botToken, chatId, messageThreadId, `⚠️ Top-up error: ${e.message}`);
+      }
+    })());
+    return res.status(200).send('OK');
+  }
+
+  // 4. BATCH RECIPE INGESTION (Multiple URLs or /queue command)
+  const allUrls = Array.from(new Set(text.match(/https?:\/\/[^\s>"]+/gi) || []));
+  const isQueueCommand = lowerText.startsWith('/queue') || lowerText.startsWith('/reserve') || lowerText.startsWith('/batch');
+
+  if (allUrls.length > 1 || (isQueueCommand && allUrls.length > 0)) {
+    await sendTelegramMessage(
+      botToken,
+      chatId,
+      messageThreadId,
+      `📥 <b>Received ${allUrls.length} recipe link(s)!</b>\nAdding to your Reserve Queue and checking Buffer for open slots...`
+    );
+
+    waitUntil((async () => {
+      try {
+        const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'slyde-bay.vercel.app';
+        // @ts-ignore
+        const { addRecipesToReserve, topUpBufferQueue, getBufferQueueStatus, getReserveQueueStatus } = await import('../server/bufferReplenisher.js');
+
+        // 1. Add to reserve
+        const addResult = addRecipesToReserve(allUrls);
+
+        // 2. Fill Buffer up to 10 slots
+        const topUpResult = await topUpBufferQueue({ host });
+        const bufStatus = await getBufferQueueStatus();
+        const resStatus = getReserveQueueStatus();
+
+        let report = `✅ <b>Reserve Queue Updated!</b>\n\n` +
+          `• <b>+${addResult.addedCount}</b> recipe(s) added to reserve.\n`;
+
+        if (topUpResult?.scheduledCount > 0) {
+          report += `• 🚀 <b>${topUpResult.scheduledCount} recipe(s) auto-scheduled to Buffer</b> (Buffer is now ${bufStatus.totalScheduled}/10 full)!\n`;
+        } else if (bufStatus.totalScheduled >= 10) {
+          report += `• 📊 Buffer is currently full (10/10 scheduled).\n`;
+        }
+
+        report += `• 📦 <b>${resStatus.pendingCount} recipe(s) waiting in reserve</b> to automatically refill Buffer daily.\n\n` +
+          `<i>✨ All posts are scheduled directly via Buffer API with 60 FPS videos, complete ingredients, directions & hashtags!</i>`;
+
+        await sendTelegramMessage(botToken, chatId, messageThreadId, report);
+      } catch (e: any) {
+        await sendTelegramMessage(botToken, chatId, messageThreadId, `⚠️ Error processing batch: ${e.message}`);
+      }
+    })());
+
+    return res.status(200).send('OK');
+  }
+
+  // 5. SINGLE RECIPE URL HANDLING
   const urlMatch = text.match(/https?:\/\/[^\s]+/i);
   if (urlMatch) {
     const recipeUrl = urlMatch[0];
-    const lowerText = text.toLowerCase().trim();
 
     const isDirectCommand = lowerText.startsWith('/') && (
       lowerText.startsWith('/slides') || lowerText.startsWith('/slide') ||
@@ -1117,6 +1266,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ],
           [
             { text: '⚡ Video + Slides + Caption', callback_data: `slyde:${shortId}:all:9-16` },
+            { text: '📥 Add to Buffer Reserve', callback_data: `slyde:${shortId}:reserve:none` }
+          ],
+          [
             { text: '📋 Caption Only', callback_data: `slyde:${shortId}:caption:none` }
           ]
         ]
@@ -1126,7 +1278,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         botToken,
         chatId,
         messageThreadId,
-        `🍳 <b>${escapeHtml(previewTitle)}</b>\n🔗 <a href="${recipeUrl}">Source Recipe</a>\n\n👇 <b>Tap a button to choose format & aspect ratio:</b>`,
+        `🍳 <b>${escapeHtml(previewTitle)}</b>\n🔗 <a href="${recipeUrl}">Source Recipe</a>\n\n👇 <b>Tap a button to choose format or add to reserve:</b>`,
         'HTML',
         inlineKeyboard
       );

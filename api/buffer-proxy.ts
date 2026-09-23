@@ -485,6 +485,59 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    if (action === 'get_queue_status') {
+      // @ts-ignore
+      const { getBufferQueueStatus, getReserveQueueStatus } = await import('../server/bufferReplenisher.js');
+      const bufferStatus = await getBufferQueueStatus(cleanToken);
+      const reserveStatus = getReserveQueueStatus();
+
+      return res.status(200).json({
+        success: true,
+        buffer: bufferStatus,
+        reserve: reserveStatus
+      });
+    }
+
+    if (action === 'add_to_reserve') {
+      const { urls = [], autoTopUp = true } = req.body || {};
+      // @ts-ignore
+      const { addRecipesToReserve, topUpBufferQueue, getBufferQueueStatus, getReserveQueueStatus } = await import('../server/bufferReplenisher.js');
+      const added = addRecipesToReserve(urls);
+
+      let topUpResult = null;
+      if (autoTopUp) {
+        const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'slyde-bay.vercel.app';
+        topUpResult = await topUpBufferQueue({ host });
+      }
+
+      const bufferStatus = await getBufferQueueStatus(cleanToken);
+      const reserveStatus = getReserveQueueStatus();
+
+      return res.status(200).json({
+        success: true,
+        added,
+        topUpResult,
+        buffer: bufferStatus,
+        reserve: reserveStatus
+      });
+    }
+
+    if (action === 'top_up_queue') {
+      const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'slyde-bay.vercel.app';
+      // @ts-ignore
+      const { topUpBufferQueue, getBufferQueueStatus, getReserveQueueStatus } = await import('../server/bufferReplenisher.js');
+      const result = await topUpBufferQueue({ host });
+      const bufferStatus = await getBufferQueueStatus(cleanToken);
+      const reserveStatus = getReserveQueueStatus();
+
+      return res.status(200).json({
+        success: result.success,
+        result,
+        buffer: bufferStatus,
+        reserve: reserveStatus
+      });
+    }
+
     return res.status(400).json({ success: false, message: 'Unknown action' });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: err.message });

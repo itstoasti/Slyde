@@ -1,8 +1,19 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "crons": [
+    {
+      "path": "/api/cron-replenish",
+      "schedule": "0 15 * * *"
+    }
+  ],
   "functions": {
     "api/telegram-webhook.ts": {
+      "memory": 2048,
+      "maxDuration": 60,
+      "includeFiles": "public/audio/**"
+    },
+    "api/cron-replenish.ts": {
       "memory": 2048,
       "maxDuration": 60,
       "includeFiles": "public/audio/**"

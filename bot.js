@@ -649,6 +649,29 @@ async function pollUpdates() {
                 saveRecipeToQueue(recipe);
                 const caption = await generateSocialCaption(recipe);
 
+                if (format === 'reserve') {
+                  const { addRecipesToReserve, topUpBufferQueue, getBufferQueueStatus, getReserveQueueStatus } = await import('./server/bufferReplenisher.js');
+                  const addRes = addRecipesToReserve(targetUrl);
+                  const topUpRes = await topUpBufferQueue();
+                  const bufStatus = await getBufferQueueStatus();
+                  const resStatus = getReserveQueueStatus();
+
+                  let msg = `📥 <b>Recipe Added to Buffer Reserve!</b>\n\n🍽️ <b>${targetTitle || recipe.title || 'Recipe'}</b>\n`;
+                  if (topUpRes?.scheduledCount > 0) {
+                    msg += `🚀 <b>Auto-scheduled to Buffer!</b> (Buffer is now ${bufStatus.totalScheduled}/10 full).\n`;
+                  } else {
+                    msg += `📊 Buffer is full (10/10). Saved in reserve — will auto-schedule as soon as a slot opens!\n`;
+                  }
+                  msg += `📦 Reserve inventory: <b>${resStatus.pendingCount}</b> recipe(s) waiting.\n\n<i>✨ Direct API scheduling active.</i>`;
+
+                  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: chatId, ...(messageThreadId ? { message_thread_id: messageThreadId } : {}), text: msg, parse_mode: 'HTML' })
+                  });
+                  continue;
+                }
+
                 if (format === 'caption') {
                   await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                     method: 'POST',
@@ -742,38 +765,178 @@ async function pollUpdates() {
           continue;
         }
 
-        if (text.startsWith('/batch') || text.startsWith('/schedule')) {
-          const matchedUrls = text.match(/https?:\/\/[^\s]+/gi) || [];
-          if (matchedUrls.length > 0) {
+        const lowerText = text.toLowerCase().trim();
+
+        // 1. HELP / START COMMAND
+        if (lowerText.startsWith('/start') || lowerText.startsWith('/help')) {
+          await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
+              text: `🎬 <b>Welcome to Slyde Automation Bot!</b>\n\n` +
+                `<b>⚡ Quick Generation:</b>\n` +
+                `• Send <b>any recipe URL</b> to choose options via buttons\n` +
+                `• <code>/video &lt;url&gt;</code> — 9s Video with Lo-Fi music\n` +
+                `• <code>/slides 9:16 &lt;url&gt;</code> — 3-Slide 9:16 Carousel\n` +
+                `• <code>/slides 1:1 &lt;url&gt;</code> — 3-Slide Square Carousel\n` +
+                `• <code>/all &lt;url&gt;</code> — Video + 3 Slides + Caption\n\n` +
+                `<b>🚀 Buffer Reserve & 10-Post Autopilot:</b>\n` +
+                `• <b>Paste 15–30 recipe links</b> in one message (or <code>/queue &lt;urls...&gt;</code>)\n` +
+                `  <i>Slyde adds them to your reserve, fills Buffer up to 10/10 posts, and auto-refills daily!</i>\n` +
+                `• <code>/buffer</code> or <code>/status</code> — View active Buffer queue & reserve count\n` +
+                `• <code>/topup</code> or <code>/replenish</code> — Fill open Buffer slots immediately\n\n` +
+                `🆔 <i>Your Chat ID: <code>${chatId}</code></i>`,
+              parse_mode: 'HTML'
+            })
+          });
+          continue;
+        }
+
+        // 2. BUFFER / STATUS COMMAND
+        if (lowerText.startsWith('/buffer') || lowerText.startsWith('/status') || lowerText.startsWith('/queue_status')) {
+          try {
+            const { getBufferQueueStatus, getReserveQueueStatus } = await import('./server/bufferReplenisher.js');
+            const bufStatus = await getBufferQueueStatus();
+            const resStatus = getReserveQueueStatus();
+
+            const latestDateStr = bufStatus.latestDueAt 
+              ? new Date(bufStatus.latestDueAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+              : 'None scheduled';
+
+            const statusMsg = `📊 <b>Buffer & Reserve Queue Health</b>\n\n` +
+              `🎯 <b>Buffer Active Queue:</b> <b>${bufStatus.totalScheduled}/10</b> posts scheduled\n` +
+              `🔓 <b>Buffer Open Slots:</b> <b>${bufStatus.slotsAvailable}</b> available\n` +
+              `⏰ <b>Latest Scheduled:</b> ${latestDateStr}\n\n` +
+              `📦 <b>Reserve Inventory:</b> <b>${resStatus.pendingCount}</b> recipe(s) waiting\n` +
+              `✅ <b>Total Ingested:</b> ${resStatus.totalCount} recipe(s)\n\n` +
+              `<i>Tip: Paste 15–30 recipe URLs here anytime to refill your monthly reserve queue!</i>`;
+
             await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 chat_id: chatId,
                 ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
-                text: `🚀 <b>Received ${matchedUrls.length} recipe URLs for daily scheduling!</b>\n\nStarting automated background pipeline: extracting recipes, writing viral captions, rendering 60 FPS videos with high-vibe soundtrack, and scheduling 1 post per day across your Buffer accounts (TikTok, Instagram & Threads)...`,
+                text: statusMsg,
                 parse_mode: 'HTML'
               })
             });
-
-            import('./server/batchScheduler.js').then(({ scheduleBatch }) => {
-              scheduleBatch({
-                urls: matchedUrls,
-                cadence: '1-daily',
-                preferredTime: '11:30',
-                musicVibe: 'auto'
-              }).catch(err => {
-                console.error('Batch schedule error in bot:', err);
-              });
-            });
-            continue;
+          } catch (e) {
+            console.error('Error fetching Buffer status in bot:', e);
           }
+          continue;
         }
 
+        // 3. TOP-UP / REPLENISH COMMAND
+        if (lowerText.startsWith('/topup') || lowerText.startsWith('/replenish')) {
+          await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
+              text: `⚡ <b>Checking Buffer queue and refilling open slots from reserve...</b>`,
+              parse_mode: 'HTML'
+            })
+          });
+
+          import('./server/bufferReplenisher.js').then(async ({ topUpBufferQueue }) => {
+            try {
+              const res = await topUpBufferQueue();
+              if (res.scheduledCount > 0) {
+                const list = (res.newlyScheduled || []).map((p, i) => `  ${i + 1}. <b>${p.title}</b>`).join('\n');
+                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    chat_id: chatId,
+                    ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
+                    text: `🎉 <b>Buffer Queue Top-Up Complete!</b>\n\n` +
+                      `✅ Scheduled <b>${res.scheduledCount}</b> new recipe(s) to Buffer!\n` +
+                      `📊 Buffer is now <b>${res.totalScheduled}/10</b> full.\n` +
+                      `📦 <b>${res.remainingInReserve}</b> recipe(s) remain in reserve.\n\n` +
+                      `${list}\n\n` +
+                      `<i>✨ Direct automated API publishing — no manual phone reminders needed.</i>`,
+                    parse_mode: 'HTML'
+                  })
+                });
+              } else {
+                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    chat_id: chatId,
+                    ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
+                    text: `ℹ️ <b>Buffer Queue Status:</b>\n\n${res.message}`,
+                    parse_mode: 'HTML'
+                  })
+                });
+              }
+            } catch (err) {
+              console.error('Top-up error in bot:', err);
+            }
+          });
+          continue;
+        }
+
+        // 4. BATCH INGESTION (Multiple URLs or /queue command)
+        const allUrls = Array.from(new Set(text.match(/https?:\/\/[^\s>"]+/gi) || []));
+        const isQueueCommand = lowerText.startsWith('/queue') || lowerText.startsWith('/reserve') || lowerText.startsWith('/batch') || lowerText.startsWith('/schedule');
+
+        if (allUrls.length > 1 || (isQueueCommand && allUrls.length > 0)) {
+          await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
+              text: `📥 <b>Received ${allUrls.length} recipe link(s)!</b>\nAdding to your Reserve Queue and checking Buffer for open slots...`,
+              parse_mode: 'HTML'
+            })
+          });
+
+          import('./server/bufferReplenisher.js').then(async ({ addRecipesToReserve, topUpBufferQueue, getBufferQueueStatus, getReserveQueueStatus }) => {
+            try {
+              const addResult = addRecipesToReserve(allUrls);
+              const topUpResult = await topUpBufferQueue();
+              const bufStatus = await getBufferQueueStatus();
+              const resStatus = getReserveQueueStatus();
+
+              let report = `✅ <b>Reserve Queue Updated!</b>\n\n` +
+                `• <b>+${addResult.addedCount}</b> recipe(s) added to reserve.\n`;
+
+              if (topUpResult?.scheduledCount > 0) {
+                report += `• 🚀 <b>${topUpResult.scheduledCount} recipe(s) auto-scheduled to Buffer</b> (Buffer is now ${bufStatus.totalScheduled}/10 full)!\n`;
+              } else if (bufStatus.totalScheduled >= 10) {
+                report += `• 📊 Buffer is currently full (10/10 scheduled).\n`;
+              }
+
+              report += `• 📦 <b>${resStatus.pendingCount} recipe(s) waiting in reserve</b> to automatically refill Buffer daily.\n\n` +
+                `<i>✨ All posts are scheduled directly via Buffer API with 60 FPS videos, complete ingredients, directions & hashtags!</i>`;
+
+              await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chat_id: chatId,
+                  ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
+                  text: report,
+                  parse_mode: 'HTML'
+                })
+              });
+            } catch (err) {
+              console.error('Batch error in bot:', err);
+            }
+          });
+          continue;
+        }
+
+        // 5. SINGLE RECIPE URL HANDLING
         const urlMatch = text.match(/https?:\/\/[^\s]+/i);
         if (urlMatch) {
           const recipeUrl = urlMatch[0];
-          const lowerText = text.toLowerCase().trim();
 
           const isDirectCommand = lowerText.startsWith('/') && (
             lowerText.startsWith('/slides') || lowerText.startsWith('/slide') ||
@@ -810,6 +973,9 @@ async function pollUpdates() {
                 ],
                 [
                   { text: '⚡ Video + Slides + Caption', callback_data: `slyde:${shortId}:all:9-16` },
+                  { text: '📥 Add to Buffer Reserve', callback_data: `slyde:${shortId}:reserve:none` }
+                ],
+                [
                   { text: '📋 Caption Only', callback_data: `slyde:${shortId}:caption:none` }
                 ]
               ]
@@ -821,7 +987,7 @@ async function pollUpdates() {
               body: JSON.stringify({
                 chat_id: chatId,
                 ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
-                text: `🍳 <b>${previewTitle}</b>\n🔗 <a href="${recipeUrl}">Source Recipe</a>\n\n👇 <b>Tap a button to choose format & aspect ratio:</b>`,
+                text: `🍳 <b>${previewTitle}</b>\n🔗 <a href="${recipeUrl}">Source Recipe</a>\n\n👇 <b>Tap a button to choose format or add to reserve:</b>`,
                 parse_mode: 'HTML',
                 reply_markup: inlineKeyboard
               })

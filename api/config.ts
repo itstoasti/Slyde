@@ -138,13 +138,30 @@ function maskSecret(str: string): string {
   // 4. RECIPES QUEUE
   if (type === 'recipes') {
     if (req.method === 'POST') {
-      const { queue = [], activeId } = req.body || {};
-      writeJsonFile('recipes_queue.json', { queue, activeId });
-      return res.status(200).json({ success: true, count: queue.length });
+      const { queue = [], recipes = [], activeId } = req.body || {};
+      const list = recipes.length > 0 ? recipes : queue;
+      const payload = { recipes: list, queue: list, activeId, lastUpdated: new Date().toISOString() };
+      
+      writeJsonFile('recipes_queue.json', payload);
+      try {
+        fs.writeFileSync('/tmp/recipes_queue.json', JSON.stringify(payload, null, 2));
+      } catch (e) {}
+
+      return res.status(200).json({ success: true, count: list.length });
     }
 
-    const saved = readJsonFile('recipes_queue.json', { queue: [], activeId: null });
-    return res.status(200).json(saved);
+    let saved = null;
+    if (fs.existsSync('/tmp/recipes_queue.json')) {
+      try {
+        saved = JSON.parse(fs.readFileSync('/tmp/recipes_queue.json', 'utf8'));
+      } catch (e) {}
+    }
+    if (!saved) {
+      saved = readJsonFile('recipes_queue.json', { recipes: [], queue: [], activeId: null });
+    }
+
+    const list = Array.isArray(saved.recipes) ? saved.recipes : (Array.isArray(saved.queue) ? saved.queue : (Array.isArray(saved) ? saved : []));
+    return res.status(200).json({ ...saved, recipes: list, queue: list });
   }
 
   // 5. BUFFER CONFIG
