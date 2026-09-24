@@ -1,6 +1,7 @@
 import React from 'react';
 import { RecipeData, ThemeConfig, AspectRatio } from '../../types';
 import { getProxiedImageUrl, getBrandLogoUrl, DEFAULT_BRAND_LOGO } from '../../utils/imageProxy';
+import { cleanRecipeTitle } from '../../utils/recipeExtractor';
 
 interface Slide1HeroProps {
   recipe: RecipeData;
@@ -39,6 +40,7 @@ export const Slide1Hero: React.FC<Slide1HeroProps> = ({ recipe, theme, aspectRat
   const cleanRightBadge = recipe.highlightBadge || `${recipe.cookTime || recipe.prepTime} · ${recipe.servings} SERVINGS`;
   const proxiedImage = getProxiedImageUrl(recipe.heroImage);
   const logoUrl = getBrandLogoUrl(recipe.brandLogo);
+  const displayTitle = (cleanRecipeTitle(recipe.title, recipe.sourceUrl || '') || 'DELICIOUS HOMEMADE RECIPE').toUpperCase();
 
   return (
     <div
@@ -91,7 +93,7 @@ export const Slide1Hero: React.FC<Slide1HeroProps> = ({ recipe, theme, aspectRat
       <div className="slide-hero-safe-content">
         {/* Big Bold Headline Title */}
         <h1 className="hero-recipe-title">
-          {recipe.title}
+          {displayTitle}
         </h1>
 
         {/* Hook Description Underneath Title */}

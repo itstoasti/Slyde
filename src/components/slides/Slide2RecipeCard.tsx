@@ -1,6 +1,7 @@
 import React from 'react';
 import { RecipeData, ThemeConfig, AspectRatio, Slide2LayoutConfig } from '../../types';
 import { getProxiedImageUrl } from '../../utils/imageProxy';
+import { cleanRecipeTitle } from '../../utils/recipeExtractor';
 
 interface Slide2RecipeCardProps {
   recipe: RecipeData;
@@ -263,6 +264,7 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
   }
 
   const proxiedImage = getProxiedImageUrl(recipe.heroImage);
+  const displayTitle = (cleanRecipeTitle(recipe.title, recipe.sourceUrl || '') || 'RECIPE CARD').toUpperCase();
 
   return (
     <div
@@ -283,12 +285,12 @@ export const Slide2RecipeCard: React.FC<Slide2RecipeCardProps> = ({ recipe, them
         <div className="card-header-left">
           <span className="card-eyebrow">RECIPE CARD</span>
           <h2 className="card-title">
-            {recipe.title}
+            {displayTitle}
           </h2>
         </div>
         {config.showThumbnail && proxiedImage && (
           <div className="card-header-thumbnail">
-            <img src={proxiedImage} alt={recipe.title} crossOrigin="anonymous" />
+            <img src={proxiedImage} alt={displayTitle} crossOrigin="anonymous" />
           </div>
         )}
       </div>

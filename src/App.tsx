@@ -12,6 +12,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { ExportModal } from './components/ExportModal';
 import { BulkScheduleModal } from './components/BulkScheduleModal';
 import { startTelegramListener, stopTelegramListener } from './utils/telegramListener';
+import { cleanRecipeTitle, synthesizeDishRecipe } from './utils/recipeExtractor';
 import confetti from 'canvas-confetti';
 
 const STORAGE_KEY_TELEGRAM = 'slyde_telegram_config';
@@ -28,11 +29,28 @@ export const App: React.FC = () => {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Update presets with latest default perks if needed
-          return parsed.map((r: RecipeData) => ({
-            ...r,
-            perks: r.perks && r.perks.length === 4 && r.perks[0].title === 'Save from anywhere' ? [...DEFAULT_PERKS] : (r.perks || [...DEFAULT_PERKS])
-          }));
+          // Update presets with latest default perks, clean titles, and purge dummy ingredients
+          return parsed.map((r: RecipeData) => {
+            const cleanTitle = cleanRecipeTitle(r.title, r.sourceUrl || '').toUpperCase();
+            let ingredients = r.ingredients;
+            let method = r.method;
+            if (
+              !ingredients ||
+              ingredients.length === 0 ||
+              ingredients.some((i: any) => (i.name || '').includes('Core Protein') || (i.name || '').includes('Artisan Spice'))
+            ) {
+              const synth = synthesizeDishRecipe(cleanTitle, r.sourceUrl || '');
+              ingredients = synth.ingredients;
+              method = synth.method;
+            }
+            return {
+              ...r,
+              title: cleanTitle,
+              ingredients,
+              method,
+              perks: r.perks && r.perks.length === 4 && r.perks[0].title === 'Save from anywhere' ? [...DEFAULT_PERKS] : (r.perks || [...DEFAULT_PERKS])
+            };
+          });
         }
       } catch (e) {}
     }
@@ -233,8 +251,28 @@ const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
         if (Array.isArray(data.recipes) && data.recipes.length > 0) {
           const hasLocal = localStorage.getItem(STORAGE_KEY_RECIPES);
           if (!hasLocal) {
-            setRecipesQueue(data.recipes);
-            if (data.recipes[0]?.id) setActiveRecipeId(data.recipes[0].id);
+            const sanitized = data.recipes.map((r: RecipeData) => {
+              const cleanTitle = cleanRecipeTitle(r.title, r.sourceUrl || '').toUpperCase();
+              let ingredients = r.ingredients;
+              let method = r.method;
+              if (
+                !ingredients ||
+                ingredients.length === 0 ||
+                ingredients.some((i: any) => (i.name || '').includes('Core Protein') || (i.name || '').includes('Artisan Spice'))
+              ) {
+                const synth = synthesizeDishRecipe(cleanTitle, r.sourceUrl || '');
+                ingredients = synth.ingredients;
+                method = synth.method;
+              }
+              return {
+                ...r,
+                title: cleanTitle,
+                ingredients,
+                method
+              };
+            });
+            setRecipesQueue(sanitized);
+            if (sanitized[0]?.id) setActiveRecipeId(sanitized[0].id);
           }
         }
       })

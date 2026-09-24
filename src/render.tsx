@@ -6,6 +6,7 @@ import { DEFAULT_BRAND_LOGO } from './assets/defaultBrandLogo';
 import { Slide1Hero } from './components/slides/Slide1Hero';
 import { Slide2RecipeCard } from './components/slides/Slide2RecipeCard';
 import { Slide3CTA } from './components/slides/Slide3CTA';
+import { cleanRecipeTitle, synthesizeDishRecipe, getFallbackImage } from './utils/recipeExtractor';
 import './index.css';
 
 declare global {
@@ -19,8 +20,12 @@ const normalizeRecipe = (r: any): RecipeData => {
   const base = RECIPE_PRESETS[0];
   if (!r) return base;
 
+  const url = r.sourceUrl || r.url || '';
+  const rawTitle = r.title || r.name || '';
+  const cleanTitle = cleanRecipeTitle(rawTitle, url).toUpperCase();
+
   // Format ingredients to { name, amount }
-  let formattedIngs = base.ingredients;
+  let formattedIngs: { name: string; amount: string }[] = [];
   if (Array.isArray(r.ingredients) && r.ingredients.length > 0) {
     formattedIngs = r.ingredients.map((ing: any) => {
       if (typeof ing === 'string') {
@@ -28,31 +33,59 @@ const normalizeRecipe = (r: any): RecipeData => {
         if (parts.length > 1 && /^[\d/.-]+/.test(parts[0])) {
           return { amount: parts.slice(0, 2).join(' '), name: parts.slice(2).join(' ') || parts[1] };
         }
-        return { amount: '1 item', name: ing };
+        return { amount: '', name: ing };
       }
       return { name: ing.name || 'Ingredient', amount: ing.amount || '' };
-    });
+    }).filter((i: { name: string; amount: string }) => i.name && i.name.toLowerCase() !== 'ingredient');
   }
 
   // Format method/instructions to string[]
-  let formattedMethod = base.method;
+  let formattedMethod: string[] = [];
   if (Array.isArray(r.method) && r.method.length > 0) {
     formattedMethod = r.method;
   } else if (Array.isArray(r.instructions) && r.instructions.length > 0) {
     formattedMethod = r.instructions;
   }
 
+  let prepTime = r.prepTime;
+  let cookTime = r.cookTime;
+  let servings = r.servings;
+  let calories = r.calories;
+  let proteinCallout = r.proteinCallout;
+
+  // If ingredients or method are missing or contain old dummy placeholders, synthesize matching authentic recipe
+  if (
+    formattedIngs.length === 0 ||
+    formattedMethod.length === 0 ||
+    formattedIngs.some((i: any) => (i.name || '').includes('Core Protein') || (i.name || '').includes('Artisan Spice'))
+  ) {
+    const synth = synthesizeDishRecipe(cleanTitle, url);
+    formattedIngs = synth.ingredients;
+    formattedMethod = synth.method;
+    if (!prepTime) prepTime = synth.prepTime;
+    if (!cookTime) cookTime = synth.cookTime;
+    if (!servings) servings = synth.servings;
+    if (!calories) calories = synth.calories;
+    if (!proteinCallout) proteinCallout = synth.proteinCallout;
+  }
+
+  let heroImage = r.heroImage || r.image;
+  if (!heroImage) {
+    heroImage = getFallbackImage(cleanTitle);
+  }
+
   return {
     ...base,
     ...r,
-    title: r.title || base.title,
+    title: cleanTitle || base.title,
     shortHook: r.shortHook || base.shortHook,
     taglineBadge: r.taglineBadge || base.taglineBadge || 'EASY RECIPE',
-    heroImage: r.heroImage || r.image || base.heroImage,
-    prepTime: r.prepTime || base.prepTime || '10m',
-    cookTime: r.cookTime || base.cookTime || '20m',
-    servings: r.servings || base.servings || '4',
-    calories: r.calories || base.calories || '350 cal',
+    heroImage,
+    prepTime: prepTime || base.prepTime || '10m',
+    cookTime: cookTime || base.cookTime || '20m',
+    servings: servings || base.servings || '4',
+    calories: calories || base.calories || '350 cal',
+    proteinCallout: proteinCallout || r.proteinCallout,
     ingredients: formattedIngs,
     method: formattedMethod,
     brandName: r.brandName || base.brandName,

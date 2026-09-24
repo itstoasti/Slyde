@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import fs from 'fs';
 import path from 'path';
 import { getAvailableAudioTracks } from './server/audioManager.js';
-import { scheduleBatch } from './server/batchScheduler.js';
+import { scheduleBatch, extractRecipe } from './server/batchScheduler.js';
 
 // Vite Plugin to sync Telegram credentials and proxy external recipe images (bypasses hotlink protection & CORS)
 function slydeServerPlugin() {
@@ -762,6 +762,39 @@ function slydeServerPlugin() {
               res.statusCode = 500;
               res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify({ success: false, message: e.message }));
+            }
+          });
+          return;
+        }
+
+        // 5. Direct Recipe Extraction API (Puppeteer + Anti-Bot Bypass on Vite Server)
+        if (req.url === '/api/extract-recipe' && req.method === 'POST') {
+          let body = '';
+          req.on('data', chunk => { body += chunk; });
+          req.on('end', async () => {
+            try {
+              const { url, brandDefaults } = JSON.parse(body);
+              if (!url || typeof url !== 'string') {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: false, message: 'URL is required' }));
+                return;
+              }
+              const defaultBranding = {
+                brandName: 'SnapRecipes',
+                socialHandle: '@snaprecipes',
+                ctaUrl: 'snaprecipes.xyz',
+                brandLogo: '/snaprecipes-app-icon.png',
+                brandLogoSize: 58,
+                ...(brandDefaults || {})
+              };
+              const recipe = await extractRecipe(url, defaultBranding);
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: true, recipe }));
+            } catch (err: any) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, message: err.message }));
             }
           });
           return;

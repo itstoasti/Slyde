@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 import { execFileSync } from 'child_process';
 import puppeteer from 'puppeteer-core';
 import { selectAudioTrack } from './audioManager.js';
-import { extractRecipe, generateSocialCaption } from './batchScheduler.js';
+import { extractRecipe, generateSocialCaption, cleanRecipeTitle } from './batchScheduler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -147,19 +147,8 @@ export function addRecipesToReserve(urlsOrRecipes) {
       if (!url.startsWith('http')) continue;
       if (existingUrls.has(url.toLowerCase())) continue;
 
-      // Derive provisional title from URL slug
-      let provisionalTitle = 'Featured Recipe';
-      try {
-        const u = new URL(url);
-        const segments = u.pathname.split('/').filter(Boolean);
-        const last = segments[segments.length - 1] || '';
-        if (last) {
-          provisionalTitle = last
-            .replace(/[-_]/g, ' ')
-            .replace(/\b\w/g, c => c.toUpperCase())
-            .replace(/\.html?$/i, '');
-        }
-      } catch (e) {}
+      // Derive clean provisional title from URL without numbers or query params
+      const provisionalTitle = cleanRecipeTitle('', url);
 
       const newEntry = {
         id: `recipe-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
