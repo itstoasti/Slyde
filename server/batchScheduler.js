@@ -1113,17 +1113,30 @@ Save this recipe on ${recipe.brandName} — skip the life story, get straight to
 
 export async function captureSlides(recipe, aspectRatio = '9:16') {
   const execPath = await getChromeExecutablePath();
+  const isLocalChrome = execPath === DEFAULT_CHROME_PATH;
+  const launchArgs = isLocalChrome
+    ? ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
+    : (chromium.args || ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']);
+
   const browser = await puppeteer.launch({
     executablePath: execPath,
     headless: true,
-    args: chromium.args || ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
+    args: launchArgs
   });
 
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1200, height: 2400, deviceScaleFactor: 2.5 });
 
-    await page.goto('http://localhost:3000/render.html', { waitUntil: 'networkidle0' });
+    let renderUrl = 'http://localhost:3000/render.html';
+    try {
+      const ping = await fetch(renderUrl, { method: 'HEAD', signal: AbortSignal.timeout(1500) });
+      if (!ping.ok) renderUrl = 'http://localhost:3001/render.html';
+    } catch (e) {
+      renderUrl = 'http://localhost:3001/render.html';
+    }
+
+    await page.goto(renderUrl, { waitUntil: 'networkidle0' });
 
     await page.evaluate((r, ratio) => {
       window.__setRecipe(r, undefined, ratio);
@@ -1149,10 +1162,15 @@ export async function captureSlides(recipe, aspectRatio = '9:16') {
 
 export async function generateVideo(buf1, buf2, buf3, audioTrackPath = null) {
   const execPath = await getChromeExecutablePath();
+  const isLocalChrome = execPath === DEFAULT_CHROME_PATH;
+  const launchArgs = isLocalChrome
+    ? ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
+    : (chromium.args || ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']);
+
   const browser = await puppeteer.launch({
     executablePath: execPath,
     headless: true,
-    args: chromium.args || ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
+    args: launchArgs
   });
 
   try {

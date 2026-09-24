@@ -222,7 +222,15 @@ async function captureSlidesWithPuppeteer(recipe, aspectRatio = '9:16') {
     const page = await browser.newPage();
     await page.setViewport({ width: 1200, height: 2400, deviceScaleFactor: 3 });
 
-    await page.goto('http://localhost:3000/render.html', { waitUntil: 'networkidle0' });
+    let renderUrl = 'http://localhost:3000/render.html';
+    try {
+      const ping = await fetch(renderUrl, { method: 'HEAD', signal: AbortSignal.timeout(1500) });
+      if (!ping.ok) renderUrl = 'http://localhost:3001/render.html';
+    } catch (e) {
+      renderUrl = 'http://localhost:3001/render.html';
+    }
+
+    await page.goto(renderUrl, { waitUntil: 'networkidle0' });
 
     // Inject recipe into React Render Harness
     await page.evaluate((r, ratio) => {
