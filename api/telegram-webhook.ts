@@ -127,6 +127,58 @@ async function extractRecipeServer(recipeUrl: string) {
     } catch (e) {}
   }
 
+  // 4. Puppeteer / Chromium fallback for anti-bot protected recipe publishers (Allrecipes, NYT Cooking, Food Network, Serious Eats, etc.)
+  if (!recipeObj && !recipeUrl.includes('youtube.com') && !recipeUrl.includes('youtu.be') && !recipeUrl.includes('tiktok.com')) {
+    try {
+      let executablePath: string;
+      try {
+        executablePath = await chromium.executablePath();
+      } catch (e) {
+        executablePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+      }
+
+      const isLocalChrome = executablePath === '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+      const launchArgs = isLocalChrome
+        ? ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
+        : (chromium.args || ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']);
+
+      const browser = await puppeteer.launch({
+        args: launchArgs,
+        executablePath: executablePath || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+        headless: true
+      });
+
+      try {
+        const page = await browser.newPage();
+        await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
+        await page.goto(recipeUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+
+        const extracted = await page.evaluate(() => {
+          const scripts = Array.from(document.querySelectorAll('script[type="application/ld+json"]'));
+          for (const s of scripts) {
+            try {
+              const p = JSON.parse(s.textContent || '');
+              const list = Array.isArray(p) ? p : (p['@graph'] ? p['@graph'] : [p]);
+              const found = list.find((x: any) => x && (x['@type'] === 'Recipe' || (Array.isArray(x['@type']) && x['@type'].includes('Recipe'))));
+              if (found) return { recipeObj: found };
+            } catch (e) {}
+          }
+          const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content') || document.querySelector('h1')?.textContent || '';
+          const ogImage = document.querySelector('meta[property="og:image"]')?.getAttribute('content') || '';
+          return { ogTitle, ogImage };
+        });
+
+        if (extracted?.recipeObj) {
+          recipeObj = extracted.recipeObj;
+        }
+      } finally {
+        await browser.close();
+      }
+    } catch (e) {
+      console.warn('Chromium recipe extraction failed:', e);
+    }
+  }
+
   // Title extraction: schema name -> og:title -> <title> -> url slug
   let rawTitle = recipeObj?.name || '';
   let imageUrl = '';

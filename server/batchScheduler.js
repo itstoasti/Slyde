@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import { selectAudioTrack } from './audioManager.js';
 
@@ -23,7 +24,19 @@ const BUFFER_CONFIG_FILE = path.join(ROOT_DIR, 'buffer_config.json');
 const BRANDING_FILE = path.join(ROOT_DIR, 'branding_config.json');
 const SCHEDULED_POSTS_FILE = path.join(ROOT_DIR, 'scheduled_posts.json');
 const TELEGRAM_CONFIG_FILE = path.join(ROOT_DIR, 'telegram_config.json');
-const CHROME_PATH = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const DEFAULT_CHROME_PATH = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+
+async function getChromeExecutablePath() {
+  if (fs.existsSync(DEFAULT_CHROME_PATH)) {
+    return DEFAULT_CHROME_PATH;
+  }
+  try {
+    const p = await chromium.executablePath();
+    if (p) return p;
+  } catch (e) {}
+  return DEFAULT_CHROME_PATH;
+}
+
 
 function loadBufferConfig() {
   if (fs.existsSync(BUFFER_CONFIG_FILE)) {
@@ -270,20 +283,29 @@ export function cleanRecipeTitle(rawTitle, url = '') {
 
 export function getFallbackImage(title) {
   const t = (title || '').toLowerCase();
+  if (t.includes('tiramisu') || t.includes('chantilly') || t.includes('parfait') || t.includes('trifle') || t.includes('berry') || t.includes('mascarpone') || t.includes('ladyfinger')) {
+    return 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?auto=format&fit=crop&w=1200&q=85';
+  }
+  if (t.includes('cheesecake')) {
+    return 'https://images.unsplash.com/photo-1533134242443-d4fd215305ad?auto=format&fit=crop&w=1200&q=85';
+  }
+  if (t.includes('pie') || t.includes('tart') || t.includes('cobbler') || t.includes('crisp')) {
+    return 'https://images.unsplash.com/photo-1519915028121-7d3463d20b13?auto=format&fit=crop&w=1200&q=85';
+  }
   if (t.includes('caramel') || t.includes('apple') || t.includes('fridge cake') || t.includes('icebox')) {
     return 'https://images.unsplash.com/photo-1568571780765-9276ac8b75a2?auto=format&fit=crop&w=1200&q=85';
   }
   if (t.includes('fudge') || t.includes('ice cream') || t.includes('brownie') || t.includes('chocolate')) {
     return 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=1200&q=85';
   }
-  if (t.includes('crab') || t.includes('rangoon') || t.includes('wonton') || t.includes('dumpling')) {
-    return 'https://images.unsplash.com/photo-1541696432-82c6da8ce7bf?auto=format&fit=crop&w=1200&q=85';
-  }
-  if (t.includes('cookie') || t.includes('doughnut') || t.includes('donut') || t.includes('cake') || t.includes('dessert')) {
+  if (t.includes('cookie') || t.includes('doughnut') || t.includes('donut') || t.includes('cake') || t.includes('dessert') || t.includes('sweet') || t.includes('sugar') || t.includes('vanilla') || t.includes('cream')) {
     return 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?auto=format&fit=crop&w=1200&q=85';
   }
   if (t.includes('pudding') || t.includes('banana')) {
     return 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=1200&q=85';
+  }
+  if (t.includes('crab') || t.includes('rangoon') || t.includes('wonton') || t.includes('dumpling')) {
+    return 'https://images.unsplash.com/photo-1541696432-82c6da8ce7bf?auto=format&fit=crop&w=1200&q=85';
   }
   if (t.includes('burger') || t.includes('smashburger') || t.includes('slider')) {
     return 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=85';
@@ -681,7 +703,85 @@ export function synthesizeDishRecipe(title, url = '') {
     };
   }
 
-  // 15. Genuine Gourmet Chef Fallback (never generic placeholders)
+  // 13. Tiramisu / Chantilly / Parfait / No-Bake Berry Dessert
+  if (t.includes('tiramisu') || t.includes('chantilly') || t.includes('parfait') || t.includes('trifle') || (t.includes('berry') && (t.includes('no-bake') || t.includes('no bake') || t.includes('dessert')))) {
+    return {
+      prepTime: '20m',
+      cookTime: '0m',
+      servings: '8',
+      calories: '380 cal',
+      proteinCallout: '6g protein',
+      ingredients: [
+        { name: 'Crisp Ladyfingers (Savoiardi)', amount: '24-30 cookies' },
+        { name: 'Italian Mascarpone Cheese & Cream Cheese', amount: '8 oz mascarpone, 4 oz cream cheese' },
+        { name: 'Cold Heavy Whipping Cream', amount: '2 cups' },
+        { name: 'Fresh Berries (Raspberries, Blackberries, Blueberries, Strawberries)', amount: '3 cups total' },
+        { name: 'Seedless Raspberry Jam & Lemon Juice', amount: '1/4 cup jam, 1 tbsp lemon' },
+        { name: 'Powdered Sugar & Pure Vanilla Extract', amount: '1/2 cup sugar, 2 tsp vanilla' }
+      ],
+      method: [
+        'Whisk room-temperature mascarpone, cream cheese, sugar, and vanilla until smooth and creamy.',
+        'In a chilled bowl, beat cold heavy cream to stiff peaks, then fold into mascarpone to create chantilly cream.',
+        'Simmer raspberry jam, water, and lemon juice to make a quick fruit soaking syrup.',
+        'Quickly dip ladyfingers into berry syrup and arrange in an even layer in a serving dish.',
+        'Spread half of chantilly cream over ladyfingers, scatter fresh berries, repeat second layer, and chill 6 hours before serving.'
+      ]
+    };
+  }
+
+  // 14. Cheesecake / Pies / Tarts
+  if (t.includes('cheesecake') || t.includes('pie') || t.includes('tart')) {
+    return {
+      prepTime: '20m',
+      cookTime: '0m',
+      servings: '8',
+      calories: '420 cal',
+      proteinCallout: '7g protein',
+      ingredients: [
+        { name: 'Graham Cracker or Biscuit Crumbs', amount: '2 cups' },
+        { name: 'Melted Unsalted Butter', amount: '6 tbsp' },
+        { name: 'Cream Cheese (softened)', amount: '16 oz (450g)' },
+        { name: 'Powdered Sugar & Pure Vanilla Extract', amount: '3/4 cup sugar, 2 tsp vanilla' },
+        { name: 'Heavy Whipping Cream', amount: '1 cup' },
+        { name: 'Fresh Berries or Fruit Compote', amount: '1 cup' }
+      ],
+      method: [
+        'Combine graham cracker crumbs and melted butter; press into pan and chill 15 minutes.',
+        'Beat softened cream cheese and powdered sugar until completely smooth and lump-free.',
+        'Whip heavy cream and vanilla to stiff peaks, then gently fold into cream cheese mixture.',
+        'Spread filling evenly over chilled crust; smooth top with an offset spatula.',
+        'Refrigerate at least 6 hours (or overnight) until firm; top with fresh fruit compote before slicing.'
+      ]
+    };
+  }
+
+  // 15. Cakes / Cupcakes / Sweet Bakery
+  if (t.includes('cake') || t.includes('cupcake') || t.includes('brownie') || t.includes('fudge') || t.includes('dessert') || t.includes('sweet') || t.includes('sugar') || t.includes('berry') || t.includes('fruit')) {
+    return {
+      prepTime: '15m',
+      cookTime: '25m',
+      servings: '8',
+      calories: '340 cal',
+      proteinCallout: '5g protein',
+      ingredients: [
+        { name: 'All-Purpose Baking Flour', amount: '2 cups' },
+        { name: 'Granulated Sugar', amount: '1 cup' },
+        { name: 'Unsalted Butter (softened)', amount: '1/2 cup (1 stick)' },
+        { name: 'Large Eggs & Whole Milk', amount: '2 eggs, 3/4 cup milk' },
+        { name: 'Baking Powder & Pure Vanilla Extract', amount: '2 tsp baking powder, 1 tsp vanilla' },
+        { name: 'Fine Sea Salt & Fresh Berries or Chocolate', amount: '1/2 tsp salt, 1 cup add-ins' }
+      ],
+      method: [
+        'Preheat oven to 350°F (175°C) and grease baking pan or line tins with paper liners.',
+        'Cream softened butter and sugar together until light, pale, and fluffy (2-3 minutes).',
+        'Add eggs one at a time, beating well after each addition, followed by vanilla extract.',
+        'Alternate adding dry ingredients and milk in batches, mixing just until combined.',
+        'Bake for 25-30 minutes until golden and a toothpick comes out clean; cool before slicing.'
+      ]
+    };
+  }
+
+  // 16. Genuine Gourmet Chef Fallback (Savory)
   return {
     prepTime: '10m',
     cookTime: '15m',
@@ -837,30 +937,36 @@ export async function extractRecipe(recipeUrl, brandDefaults) {
   }
 
   // 4. Puppeteer Fallback for Anti-Bot blocked websites (Allrecipes, NYT, Food Network)
-  if (!recipeObj && fs.existsSync(CHROME_PATH) && !cleanUrl.includes('youtube.com') && !cleanUrl.includes('youtu.be') && !cleanUrl.includes('tiktok.com')) {
+  if (!recipeObj && !cleanUrl.includes('youtube.com') && !cleanUrl.includes('youtu.be') && !cleanUrl.includes('tiktok.com')) {
     try {
+      const execPath = await getChromeExecutablePath();
+      const isLocalChrome = execPath === DEFAULT_CHROME_PATH;
+      const launchArgs = isLocalChrome
+        ? ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
+        : (chromium.args || ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']);
+
       const browser = await puppeteer.launch({
-        executablePath: CHROME_PATH,
+        executablePath: execPath,
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
+        args: launchArgs
       });
       try {
         const page = await browser.newPage();
         await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
-        await page.goto(cleanUrl, { waitUntil: 'domcontentloaded', timeout: 9000 });
+        await page.goto(cleanUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
         const pageData = await page.evaluate(() => {
           let r = null;
           const scripts = document.querySelectorAll('script[type="application/ld+json"]');
           for (const s of scripts) {
             try {
-              const json = JSON.parse(s.innerText);
+              const json = JSON.parse(s.innerText || s.textContent || '');
               const list = Array.isArray(json) ? json : (json['@graph'] ? json['@graph'] : [json]);
               const found = list.find(x => x && (x['@type'] === 'Recipe' || (Array.isArray(x['@type']) && x['@type'].includes('Recipe'))));
               if (found) { r = found; break; }
             } catch (e) {}
           }
-          const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content');
-          const ogImage = document.querySelector('meta[property="og:image"]')?.getAttribute('content');
+          const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content') || document.querySelector('h1')?.textContent || '';
+          const ogImage = document.querySelector('meta[property="og:image"]')?.getAttribute('content') || '';
           const docTitle = document.title;
           return { recipeObj: r, ogTitle, ogImage, docTitle };
         });
@@ -870,7 +976,9 @@ export async function extractRecipe(recipeUrl, brandDefaults) {
       } finally {
         await browser.close();
       }
-    } catch (pErr) {}
+    } catch (pErr) {
+      console.warn('Puppeteer extraction fallback error:', pErr);
+    }
   }
 
   if (recipeObj) {
@@ -1004,10 +1112,11 @@ Save this recipe on ${recipe.brandName} — skip the life story, get straight to
 }
 
 export async function captureSlides(recipe, aspectRatio = '9:16') {
+  const execPath = await getChromeExecutablePath();
   const browser = await puppeteer.launch({
-    executablePath: CHROME_PATH,
+    executablePath: execPath,
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
+    args: chromium.args || ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
   });
 
   try {
@@ -1039,10 +1148,11 @@ export async function captureSlides(recipe, aspectRatio = '9:16') {
 }
 
 export async function generateVideo(buf1, buf2, buf3, audioTrackPath = null) {
+  const execPath = await getChromeExecutablePath();
   const browser = await puppeteer.launch({
-    executablePath: CHROME_PATH,
+    executablePath: execPath,
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
+    args: chromium.args || ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
   });
 
   try {
