@@ -3,322 +3,27 @@ import { waitUntil } from '@vercel/functions';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 // @ts-ignore
-import { cleanRecipeTitle, synthesizeDishRecipe, getFallbackImage } from '../server/batchScheduler.js';
+import { cleanRecipeTitle, synthesizeDishRecipe, getFallbackImage, extractRecipe } from '../server/batchScheduler.js';
 
 const processedUpdates = new Set<number>();
 
-// Decode HTML entities
-function decodeEntities(str: string): string {
-  if (!str) return '';
-  return str
-    .replace(/&#39;/g, "'")
-    .replace(/&quot;/g, '"')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&#(\d+);/g, (_, c) => String.fromCharCode(Number(c)));
-}
-
-function escapeHtml(str: string): string {
+function escapeHtml(str?: string | null): string {
   return (str || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 }
 
-function formatIsoDuration(duration: string): string {
-  if (!duration) return '10m';
-  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/i);
-  if (!match) return duration.replace(/^PT/i, '').toLowerCase() || '10m';
-  const hours = match[1] ? `${match[1]}h ` : '';
-  const mins = match[2] ? `${match[2]}m` : '';
-  return `${hours}${mins}`.trim() || '10m';
-}
-
-function parseServings(rawYield: any): string {
-  if (!rawYield) return '4';
-  if (Array.isArray(rawYield)) {
-    for (const item of rawYield) {
-      const parsed = parseServings(item);
-      if (parsed && parsed !== '4') return parsed;
-    }
-    if (rawYield.length > 0) return parseServings(rawYield[0]);
-  }
-  const str = String(rawYield).trim();
-  const rangeMatch = str.match(/(\d+)\s*(?:to|-)\s*(\d+)/i);
-  if (rangeMatch) return `${rangeMatch[1]}-${rangeMatch[2]}`;
-  const numMatch = str.match(/(\d+)/);
-  if (numMatch) return numMatch[1];
-  return '4';
-}
-
-function cleanCalories(rawCal: any): string {
-  if (!rawCal) return '320 cal';
-  const str = String(rawCal);
-  const numMatch = str.match(/(\d+)/);
-  return numMatch ? `${numMatch[1]} cal` : '320 cal';
-}
-
-// Serverless Recipe Extractor
+// Serverless Recipe Extractor (Powered by master extractRecipe)
 async function extractRecipeServer(recipeUrl: string) {
-  let html = '';
-
-  // 1. Try Jina HTML proxy (fastest when allowed)
-  try {
-    const res = await fetch(`https://r.jina.ai/${recipeUrl}`, {
-      headers: { 'X-Return-Format': 'html' }
-    });
-    if (res.ok) {
-      const txt = await res.text();
-      if (txt && txt.length > 500) html = txt;
-    }
-  } catch (e) {}
-
-  // 2. Try AllOrigins raw proxy if Jina was blocked (e.g. 451)
-  if (!html || html.length < 500) {
-    try {
-      const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(recipeUrl)}`, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' }
-      });
-      if (res.ok) {
-        const txt = await res.text();
-        if (txt && txt.length > 500) html = txt;
-      }
-    } catch (e) {}
-  }
-
-  // 3. Try direct fetch with desktop browser headers
-  if (!html || html.length < 500) {
-    try {
-      const res = await fetch(recipeUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9'
-        }
-      });
-      if (res.ok) {
-        const txt = await res.text();
-        if (txt && txt.length > 500) html = txt;
-      }
-    } catch (e) {}
-  }
-
-  // Parse JSON-LD
-  let recipeObj: any = null;
-  const match = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
-  for (const m of match) {
-    try {
-      const jsonStr = m.replace(/<script.*?>|<\/script>/gi, '').trim();
-      const parsed = JSON.parse(jsonStr);
-      const list = Array.isArray(parsed) ? parsed : (parsed['@graph'] ? parsed['@graph'] : [parsed]);
-      const found = list.find((i: any) => {
-        if (!i) return false;
-        const type = i['@type'];
-        if (typeof type === 'string') return type.toLowerCase() === 'recipe';
-        if (Array.isArray(type)) return type.some((t: any) => String(t).toLowerCase() === 'recipe');
-        return false;
-      });
-      if (found) {
-        recipeObj = found;
-        break;
-      }
-    } catch (e) {}
-  }
-
-  // 4. Puppeteer / Chromium fallback for anti-bot protected recipe publishers (Allrecipes, NYT Cooking, Food Network, Serious Eats, etc.)
-  if (!recipeObj && !recipeUrl.includes('youtube.com') && !recipeUrl.includes('youtu.be') && !recipeUrl.includes('tiktok.com')) {
-    try {
-      let executablePath: string;
-      try {
-        executablePath = await chromium.executablePath();
-      } catch (e) {
-        executablePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-      }
-
-      const isLocalChrome = executablePath === '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-      const launchArgs = isLocalChrome
-        ? ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
-        : (chromium.args || ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']);
-
-      const browser = await puppeteer.launch({
-        args: launchArgs,
-        executablePath: executablePath || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-        headless: true
-      });
-
-      try {
-        const page = await browser.newPage();
-        await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
-        await page.goto(recipeUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
-
-        const extracted = await page.evaluate(() => {
-          const scripts = Array.from(document.querySelectorAll('script[type="application/ld+json"]'));
-          for (const s of scripts) {
-            try {
-              const p = JSON.parse(s.textContent || '');
-              const list = Array.isArray(p) ? p : (p['@graph'] ? p['@graph'] : [p]);
-              const found = list.find((x: any) => x && (x['@type'] === 'Recipe' || (Array.isArray(x['@type']) && x['@type'].includes('Recipe'))));
-              if (found) return { recipeObj: found };
-            } catch (e) {}
-          }
-          const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content') || document.querySelector('h1')?.textContent || '';
-          const ogImage = document.querySelector('meta[property="og:image"]')?.getAttribute('content') || '';
-          return { ogTitle, ogImage };
-        });
-
-        if (extracted?.recipeObj) {
-          recipeObj = extracted.recipeObj;
-        }
-      } finally {
-        await browser.close();
-      }
-    } catch (e) {
-      console.warn('Chromium recipe extraction failed:', e);
-    }
-  }
-
-  // Title extraction: schema name -> og:title -> <title> -> url slug
-  let rawTitle = recipeObj?.name || '';
-  let imageUrl = '';
-
-  // 1. YouTube Video oEmbed Detection
-  if (recipeUrl.includes('youtube.com') || recipeUrl.includes('youtu.be')) {
-    try {
-      const ytRes = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(recipeUrl)}&format=json`);
-      if (ytRes.ok) {
-        const ytData = await ytRes.json();
-        if (!rawTitle) rawTitle = ytData.title || '';
-        if (!imageUrl) imageUrl = ytData.thumbnail_url || '';
-      }
-    } catch (e) {}
-  }
-
-  // 2. TikTok Video oEmbed Detection
-  if (recipeUrl.includes('tiktok.com')) {
-    try {
-      const ttRes = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(recipeUrl)}`);
-      if (ttRes.ok) {
-        const ttData = await ttRes.json();
-        if (!rawTitle) rawTitle = ttData.title || '';
-        if (!imageUrl) imageUrl = ttData.thumbnail_url || '';
-      }
-    } catch (e) {}
-  }
-
-  if (!rawTitle) {
-    const ogTitle = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
-    if (ogTitle) rawTitle = ogTitle[1];
-  }
-  if (!rawTitle) {
-    const titleTag = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    if (titleTag) rawTitle = titleTag[1].split('|')[0].split('-')[0].trim();
-  }
-
-  const title = cleanRecipeTitle(rawTitle, recipeUrl);
-  let prepTime = formatIsoDuration(recipeObj?.prepTime || '10m');
-  let cookTime = formatIsoDuration(recipeObj?.cookTime || '15m');
-  let servings = parseServings(recipeObj?.recipeYield);
-  let calories = cleanCalories(recipeObj?.nutrition?.calories);
-
-  // Ingredients extraction
-  const rawIngredients = Array.isArray(recipeObj?.recipeIngredient) ? recipeObj.recipeIngredient : [];
-  let ingredients = rawIngredients.map((i: any) => {
-    const clean = decodeEntities(String(i)).trim();
-    const parts = clean.split('—').length > 1 ? clean.split('—') : clean.split(' - ');
-    if (parts.length > 1) {
-      return { name: parts[0].trim(), amount: parts.slice(1).join(' - ').trim() };
-    }
-    return { name: clean, amount: '' };
-  }).filter((i: any) => i.name.length > 0).slice(0, 16);
-
-  // Instructions extraction (with HowToSection & itemListElement flattening)
-  let method: string[] = [];
-  if (Array.isArray(recipeObj?.recipeInstructions)) {
-    const rawSteps: string[] = [];
-    for (const item of recipeObj.recipeInstructions) {
-      if (typeof item === 'string') {
-        rawSteps.push(item);
-      } else if (item?.text) {
-        rawSteps.push(item.text);
-      } else if (Array.isArray(item?.itemListElement)) {
-        for (const subItem of item.itemListElement) {
-          if (typeof subItem === 'string') rawSteps.push(subItem);
-          else if (subItem?.text) rawSteps.push(subItem.text);
-        }
-      }
-    }
-    method = rawSteps.map((s: string) => decodeEntities(s)
-      .replace(/^Step\s*\d+:\s*/i, '')
-      .replace(/^\d+\.\s*/, '')
-      .replace(/Recipe developed by.*/i, '')
-      .replace(/Recipe adapted from.*/i, '')
-      .trim()
-    ).filter(Boolean).slice(0, 6);
-  }
-
-  // Guaranteed fallback if scraping was blocked or incomplete
-  if (ingredients.length === 0 || method.length === 0) {
-    const synth = synthesizeDishRecipe(title, recipeUrl);
-    if (ingredients.length === 0) ingredients = synth.ingredients;
-    if (method.length === 0) method = synth.method;
-    if (!prepTime || prepTime === '10m') prepTime = synth.prepTime;
-    if (!cookTime || cookTime === '15m') cookTime = synth.cookTime;
-    if (!servings || servings === '4') servings = synth.servings;
-    if (synth.calories) calories = synth.calories;
-  }
-
-  if (!imageUrl) {
-    if (typeof recipeObj?.image === 'string') {
-      imageUrl = recipeObj.image;
-    } else if (Array.isArray(recipeObj?.image) && recipeObj.image[0]) {
-      imageUrl = typeof recipeObj.image[0] === 'string' ? recipeObj.image[0] : (recipeObj.image[0].url || '');
-    } else if (recipeObj?.image?.url) {
-      imageUrl = recipeObj.image.url;
-    }
-  }
-
-  if (!imageUrl) {
-    const ogMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
-    if (ogMatch) imageUrl = ogMatch[1];
-  }
-
-  if (!imageUrl) {
-    imageUrl = getFallbackImage(title);
-  }
-
-  const brandName = process.env.BRAND_NAME || 'SnapRecipes';
-  const ctaUrl = process.env.CTA_URL || 'https://snaprecipes.xyz';
-
-  return {
-    id: 'recipe-' + Date.now(),
-    title,
-    prepTime,
-    cookTime,
-    servings,
-    calories,
-    ingredients,
-    method,
-    heroImage: imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=1200&q=85',
-    brandName,
-    brandSubtitle: 'Save any recipe in one tap.',
-    shortHook: `Better than takeout and ready in ${cookTime || prepTime}. ${ingredients.length} ingredients, ${method.length} steps.`,
-    highlightBadge: `${(cookTime || prepTime).toUpperCase()} · ${servings} SERVINGS`,
-    taglineBadge: `• ${brandName.toUpperCase()} · SKIP THE LIFE STORY`,
-    brandPillBadge: 'AD-FREE · NO BLOG RANTS · JUST RECIPES',
+  const brandDefaults = {
+    brandName: process.env.BRAND_NAME || 'SnapRecipes',
+    socialHandle: process.env.SOCIAL_HANDLE || '@snaprecipes',
+    ctaUrl: process.env.CTA_URL || 'snaprecipes.xyz',
     brandLogo: process.env.BRAND_LOGO || '/snaprecipes-app-icon.png',
-    brandLogoSize: Number(process.env.BRAND_LOGO_SIZE) || 58,
-    ctaButtonText: 'Get the app — free',
-    ctaUrl,
-    socialHandle: '@' + brandName.toLowerCase().replace(/\s+/g, ''),
-    perks: [
-      { id: 1, title: 'Save from Anywhere', desc: 'Links, photos, TikTok & IG — one tap.' },
-      { id: 2, title: 'No Ads, No Rants', desc: 'Just the clean recipe, instantly.' },
-      { id: 3, title: 'Quick Extraction', desc: 'Paste a link, get tidy steps.' },
-      { id: 4, title: 'Get Started Today!', desc: 'Free to try.' }
-    ]
+    brandLogoSize: Number(process.env.BRAND_LOGO_SIZE) || 58
   };
+  return await extractRecipe(recipeUrl, brandDefaults);
 }
 
 // Generate Social Media Caption with Gemini AI or OpenRouter
@@ -654,24 +359,56 @@ async function generateVideoFromSlideBuffers(
   }
 }
 
-function saveCachedRecipe(id: string, url: string, title?: string) {
+const webhookRecipeCache = new Map<string, any>();
+
+function saveCachedRecipe(id: string, recipeOrUrl: any, title?: string) {
+  let entry: any;
+  if (recipeOrUrl && typeof recipeOrUrl === 'object') {
+    entry = {
+      shortId: id,
+      url: recipeOrUrl.sourceUrl || recipeOrUrl.url || '',
+      title: recipeOrUrl.title || title || '',
+      recipe: recipeOrUrl,
+      timestamp: Date.now()
+    };
+  } else {
+    entry = {
+      shortId: id,
+      url: String(recipeOrUrl || ''),
+      title: title || '',
+      recipe: null,
+      timestamp: Date.now()
+    };
+  }
+
+  webhookRecipeCache.set(id, entry);
+  if (entry.url) webhookRecipeCache.set(entry.url, entry);
+
   try {
     const fs = require('fs');
-    let cache: Record<string, { url: string; title?: string }> = {};
+    let diskCache: Record<string, any> = {};
     if (fs.existsSync('/tmp/slyde_recipe_cache.json')) {
-      cache = JSON.parse(fs.readFileSync('/tmp/slyde_recipe_cache.json', 'utf8'));
+      diskCache = JSON.parse(fs.readFileSync('/tmp/slyde_recipe_cache.json', 'utf8'));
     }
-    cache[id] = { url, title };
-    fs.writeFileSync('/tmp/slyde_recipe_cache.json', JSON.stringify(cache));
+    diskCache[id] = entry;
+    if (entry.url) diskCache[entry.url] = entry;
+    fs.writeFileSync('/tmp/slyde_recipe_cache.json', JSON.stringify(diskCache));
   } catch (e) {}
 }
 
-function getCachedRecipe(id: string): { url: string; title?: string } | null {
+function getCachedRecipe(idOrUrl: string): { url: string; title?: string; recipe?: any } | null {
+  if (!idOrUrl) return null;
+  if (webhookRecipeCache.has(idOrUrl)) {
+    return webhookRecipeCache.get(idOrUrl);
+  }
   try {
     const fs = require('fs');
     if (fs.existsSync('/tmp/slyde_recipe_cache.json')) {
-      const cache = JSON.parse(fs.readFileSync('/tmp/slyde_recipe_cache.json', 'utf8'));
-      return cache[id] || null;
+      const diskCache = JSON.parse(fs.readFileSync('/tmp/slyde_recipe_cache.json', 'utf8'));
+      if (diskCache[idOrUrl]) {
+        webhookRecipeCache.set(idOrUrl, diskCache[idOrUrl]);
+        return diskCache[idOrUrl];
+      }
     }
   } catch (e) {}
   return null;
@@ -887,18 +624,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const rawRatio = parts[3] || '9-16';
     const ratio: '9:16' | '1:1' | '4:5' = rawRatio.replace('-', ':') as any;
 
-    let targetUrl = extractUrlFromCallbackMessage(cb);
-    let targetTitle = '';
-
-    if (!targetUrl && shortId) {
-      const cached = getCachedRecipe(shortId);
-      if (cached) {
-        targetUrl = cached.url;
-        targetTitle = cached.title || '';
-      }
+    const cached = shortId ? getCachedRecipe(shortId) : null;
+    let targetUrl = cached?.url || extractUrlFromCallbackMessage(cb);
+    let targetTitle = cached?.title || '';
+    let targetRecipe = cached?.recipe || null;
+    if (targetRecipe) {
+      if (!targetTitle) targetTitle = targetRecipe.title;
+      if (!targetUrl) targetUrl = targetRecipe.sourceUrl || targetRecipe.url;
     }
 
-    if (!targetUrl) {
+    if (!targetUrl && !targetRecipe) {
       await answerTelegramCallbackQuery(botToken, cbId, '⚠️ Link not found. Please paste the recipe URL again.');
       return res.status(200).send('OK');
     }
@@ -921,7 +656,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     waitUntil((async () => {
       try {
         const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'slyde-bay.vercel.app';
-        const recipe = await extractRecipeServer(targetUrl);
+        const recipe = targetRecipe || (await extractRecipeServer(targetUrl || ''));
+        if (!targetRecipe && shortId) {
+          saveCachedRecipe(shortId, recipe);
+        }
         const { caption, hook } = await generateAICaptionServer(recipe);
         if (hook) {
           recipe.shortHook = hook.replace(/🍽️/g, '').trim();
@@ -1183,7 +921,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const resPreview = await extractRecipeServer(recipeUrl);
         if (resPreview?.title) {
           previewTitle = resPreview.title;
-          saveCachedRecipe(shortId, recipeUrl, previewTitle);
+          saveCachedRecipe(shortId, resPreview);
         }
       } catch (e) {}
 

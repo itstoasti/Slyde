@@ -16,6 +16,21 @@ declare global {
   }
 }
 
+let globalSetRecipeHandler: ((recipe: any, theme?: ThemeConfig, aspectRatio?: AspectRatio) => void) | null = null;
+let pendingRecipeCall: { recipe: any; theme?: ThemeConfig; aspectRatio?: AspectRatio } | null = null;
+
+if (typeof window !== 'undefined') {
+  window.__setRecipe = (newRecipe: any, newTheme?: ThemeConfig, newAspectRatio?: AspectRatio) => {
+    if (globalSetRecipeHandler) {
+      globalSetRecipeHandler(newRecipe, newTheme, newAspectRatio);
+    } else {
+      pendingRecipeCall = { recipe: newRecipe, theme: newTheme, aspectRatio: newAspectRatio };
+    }
+    window.__isReady = true;
+  };
+  window.__isReady = true;
+}
+
 const normalizeRecipe = (r: any): RecipeData => {
   const base = RECIPE_PRESETS[0];
   if (!r) return base;
@@ -47,11 +62,11 @@ const normalizeRecipe = (r: any): RecipeData => {
     formattedMethod = r.instructions;
   }
 
-  let prepTime = r.prepTime;
-  let cookTime = r.cookTime;
-  let servings = r.servings;
-  let calories = r.calories;
-  let proteinCallout = r.proteinCallout;
+  let prepTime = r.prepTime || '10m';
+  let cookTime = r.cookTime || '15m';
+  let servings = r.servings || '4';
+  let calories = r.calories || '350 cal';
+  let proteinCallout = r.proteinCallout || 'High protein';
 
   // If ingredients or method are missing or contain old dummy placeholders, synthesize matching authentic recipe
   if (
@@ -62,11 +77,11 @@ const normalizeRecipe = (r: any): RecipeData => {
     const synth = synthesizeDishRecipe(cleanTitle, url);
     formattedIngs = synth.ingredients;
     formattedMethod = synth.method;
-    if (!prepTime) prepTime = synth.prepTime;
-    if (!cookTime) cookTime = synth.cookTime;
-    if (!servings) servings = synth.servings;
-    if (!calories) calories = synth.calories;
-    if (!proteinCallout) proteinCallout = synth.proteinCallout;
+    if (!r.prepTime) prepTime = synth.prepTime;
+    if (!r.cookTime) cookTime = synth.cookTime;
+    if (!r.servings) servings = synth.servings;
+    if (!r.calories) calories = synth.calories;
+    if (!r.proteinCallout) proteinCallout = synth.proteinCallout;
   }
 
   let heroImage = r.heroImage || r.image;
@@ -74,18 +89,20 @@ const normalizeRecipe = (r: any): RecipeData => {
     heroImage = getFallbackImage(cleanTitle);
   }
 
+  const shortHook = r.shortHook || `Better than takeout and ready in ${cookTime || prepTime}. ${formattedIngs.length} ingredients, easy steps. 🍽️`;
+
   return {
-    ...base,
-    ...r,
-    title: cleanTitle || base.title,
-    shortHook: r.shortHook || base.shortHook,
-    taglineBadge: r.taglineBadge || base.taglineBadge || 'EASY RECIPE',
+    id: r.id || `recipe-${Date.now()}`,
+    title: cleanTitle || 'AUTHENTIC RECIPE',
+    shortHook,
+    taglineBadge: r.taglineBadge || `• ${(r.brandName || base.brandName).toUpperCase()} · SKIP THE LIFE STORY`,
     heroImage,
-    prepTime: prepTime || base.prepTime || '10m',
-    cookTime: cookTime || base.cookTime || '20m',
-    servings: servings || base.servings || '4',
-    calories: calories || base.calories || '350 cal',
-    proteinCallout: proteinCallout || r.proteinCallout,
+    prepTime,
+    cookTime,
+    servings,
+    calories,
+    proteinCallout,
+    highlightBadge: `${prepTime.toUpperCase()} · ${servings} SERVINGS`,
     ingredients: formattedIngs,
     method: formattedMethod,
     brandName: r.brandName || base.brandName,
@@ -97,21 +114,38 @@ const normalizeRecipe = (r: any): RecipeData => {
     ctaUrl: r.ctaUrl || base.ctaUrl,
     socialHandle: r.socialHandle || base.socialHandle,
     perks: Array.isArray(r.perks) && r.perks.length > 0 ? r.perks : base.perks,
+    slide2Config: r.slide2Config || base.slide2Config
   };
 };
 
 const RenderApp: React.FC = () => {
-  const [recipe, setRecipe] = useState<RecipeData>(RECIPE_PRESETS[0]);
-  const [theme, setTheme] = useState<ThemeConfig>(THEME_PRESETS.caramel);
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16');
+  const [recipe, setRecipe] = useState<RecipeData>(() => {
+    if (pendingRecipeCall?.recipe) return normalizeRecipe(pendingRecipeCall.recipe);
+    return RECIPE_PRESETS[0];
+  });
+  const [theme, setTheme] = useState<ThemeConfig>(() => {
+    if (pendingRecipeCall?.theme) return pendingRecipeCall.theme;
+    return THEME_PRESETS.caramel;
+  });
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>(() => {
+    if (pendingRecipeCall?.aspectRatio) return pendingRecipeCall.aspectRatio;
+    return '9:16';
+  });
 
   useEffect(() => {
-    window.__setRecipe = (newRecipe: any, newTheme?: ThemeConfig, newAspectRatio?: AspectRatio) => {
+    globalSetRecipeHandler = (newRecipe: any, newTheme?: ThemeConfig, newAspectRatio?: AspectRatio) => {
       setRecipe(normalizeRecipe(newRecipe));
       if (newTheme) setTheme(newTheme);
       if (newAspectRatio) setAspectRatio(newAspectRatio);
       window.__isReady = true;
     };
+
+    if (pendingRecipeCall) {
+      setRecipe(normalizeRecipe(pendingRecipeCall.recipe));
+      if (pendingRecipeCall.theme) setTheme(pendingRecipeCall.theme);
+      if (pendingRecipeCall.aspectRatio) setAspectRatio(pendingRecipeCall.aspectRatio);
+      pendingRecipeCall = null;
+    }
     window.__isReady = true;
   }, []);
 

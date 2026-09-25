@@ -74,7 +74,9 @@ export function cleanRecipeTitle(rawTitle: string, url: string = ''): string {
   if (isHashOrId(title)) title = '';
 
   // If no title or generic placeholder, extract from URL
-  const isGeneric = !title || /^(delicious recipe|recipe|watch|video|untitled|home|shorts?|reels?|\d+)$/i.test(title);
+  const isGeneric = !title ||
+    /^(delicious recipe|recipe|watch|video|untitled|home|shorts?|reels?|\d+)$/i.test(title) ||
+    /(simple page|access denied|403 forbidden|attention required|just a moment|cloudflare|blocked|page not found|404 not found|404 forbidden|not found)/i.test(title);
   if (isGeneric && url) {
     try {
       const u = new URL(url);
@@ -132,8 +134,8 @@ export function cleanRecipeTitle(rawTitle: string, url: string = ''): string {
     .replace(/\s+/g, ' ')
     .trim();
 
-  // 5. If title is empty, too short, generic, or an ID, use an attractive culinary default
-  if (!title || title.length < 3 || isHashOrId(title) || /^(delicious|homemade|tasty|quick|easy|amazing|best)$/i.test(title)) {
+  // 5. If title is empty, too short, generic, error title, or an ID, use an attractive culinary default
+  if (!title || title.length < 3 || isHashOrId(title) || /^(delicious|homemade|tasty|quick|easy|amazing|best|simple page|access denied|403 forbidden|attention required|just a moment|cloudflare|blocked)$/i.test(title)) {
     if (url) {
       if (url.includes('tiktok.com') || url.includes('instagram.com') || url.includes('youtube.com') || url.includes('youtu.be')) {
         title = 'Trending Viral Video Dish';
@@ -926,6 +928,23 @@ async function fetchTikTokOEmbed(url: string): Promise<{ title: string; author: 
 
 // Helper to fetch HTML through multi-proxy fallback chain (bypasses Cloudflare & CORS)
 async function fetchHtmlWithProxies(url: string): Promise<string | null> {
+  // 1. Direct fetch with social unfurler UA (bypasses anti-bot on publishers that whitelist social link expanders)
+  try {
+    const directRes = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+      },
+      signal: AbortSignal.timeout(6000)
+    });
+    if (directRes.ok) {
+      const text = await directRes.text();
+      if (text && text.length > 500 && !text.includes('45101') && !text.includes('Access Denied')) {
+        return text;
+      }
+    }
+  } catch (e) {}
+
   const proxies: Array<{ url: string; headers: Record<string, string>; isJson: boolean }> = [
     {
       url: `https://r.jina.ai/${url}`,
@@ -994,8 +1013,11 @@ export async function extractRecipeFromUrl(
     if (srvRes.ok) {
       const srvData = await srvRes.json();
       if (srvData.success && srvData.recipe) {
-        srvData.recipe.title = cleanRecipeTitle(srvData.recipe.title, cleanUrl).toUpperCase();
-        return srvData.recipe;
+        const title = cleanRecipeTitle(srvData.recipe.title, cleanUrl);
+        if (!/^(simple page|access denied|403 forbidden|attention required|just a moment|cloudflare|blocked)$/i.test(title)) {
+          srvData.recipe.title = title.toUpperCase();
+          return srvData.recipe;
+        }
       }
     }
   } catch (e) {}

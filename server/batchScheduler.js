@@ -208,7 +208,9 @@ export function cleanRecipeTitle(rawTitle, url = '') {
   if (isHashOrId(title)) title = '';
 
   // If no title or generic placeholder, extract from URL
-  const isGeneric = !title || /^(delicious recipe|recipe|watch|video|untitled|home|shorts?|reels?|\d+)$/i.test(title);
+  const isGeneric = !title ||
+    /^(delicious recipe|recipe|watch|video|untitled|home|shorts?|reels?|\d+)$/i.test(title) ||
+    /(simple page|access denied|403 forbidden|attention required|just a moment|cloudflare|blocked|page not found|404 not found|404 forbidden|not found)/i.test(title);
   if (isGeneric && url) {
     try {
       const u = new URL(url);
@@ -265,8 +267,8 @@ export function cleanRecipeTitle(rawTitle, url = '') {
     .replace(/\s+/g, ' ')
     .trim();
 
-  // 5. Fallback if empty, generic, or an ID
-  if (!title || title.length < 3 || isHashOrId(title) || /^(delicious|homemade|tasty|quick|easy|amazing|best)$/i.test(title)) {
+  // 5. Fallback if empty, generic, error title, or an ID
+  if (!title || title.length < 3 || isHashOrId(title) || /^(delicious|homemade|tasty|quick|easy|amazing|best|simple page|access denied|403 forbidden|attention required|just a moment|cloudflare|blocked)$/i.test(title)) {
     if (url) {
       if (url.includes('tiktok.com') || url.includes('instagram.com') || url.includes('youtube.com') || url.includes('youtu.be')) {
         title = 'Trending Viral Video Dish';
@@ -888,33 +890,82 @@ export async function extractRecipe(recipeUrl, brandDefaults) {
     }
   }
 
-  // 3. Fast HTML fetch via Jina / Direct
+  // 3. Fast HTML fetch via Social Unfurler Chain (Discordbot / Slackbot / Direct / Jina)
   let html = '';
-  if (!title) {
-    try {
-      const res = await fetch(`https://r.jina.ai/${cleanUrl}`, {
-        headers: { 'X-Return-Format': 'html' }
-      });
-      if (res.ok) {
-        const txt = await res.text();
-        if (txt && !txt.includes('45101')) html = txt;
-      }
-    } catch (e) {}
+  let recipeObj = null;
 
-    if (!html || html.length < 500) {
+  if (!title) {
+    const unfurlerUas = [
+      'Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)',
+      'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)'
+    ];
+
+    for (const ua of unfurlerUas) {
+      try {
+        const res = await fetch(cleanUrl, {
+          headers: {
+            'User-Agent': ua,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9'
+          },
+          signal: AbortSignal.timeout(8000)
+        });
+        if (res.ok) {
+          const txt = await res.text();
+          if (txt && txt.length > 800 && !txt.includes('45101')) {
+            html = txt;
+            const match = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
+            for (const scriptContent of match) {
+              try {
+                const jsonStr = scriptContent.replace(/<script.*?>|<\/script>/gi, '').trim();
+                const parsed = JSON.parse(jsonStr);
+                const list = Array.isArray(parsed) ? parsed : (parsed['@graph'] ? parsed['@graph'] : [parsed]);
+                const found = list.find((item) => {
+                  if (!item) return false;
+                  const type = item['@type'];
+                  if (typeof type === 'string') return type.toLowerCase() === 'recipe';
+                  if (Array.isArray(type)) return type.some(t => String(t).toLowerCase() === 'recipe');
+                  return false;
+                });
+                if (found) {
+                  recipeObj = found;
+                  break;
+                }
+              } catch (e) {}
+            }
+            if (recipeObj) break;
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (!recipeObj && (!html || html.length < 500)) {
+      try {
+        const res = await fetch(`https://r.jina.ai/${cleanUrl}`, {
+          headers: { 'X-Return-Format': 'html' },
+          signal: AbortSignal.timeout(6000)
+        });
+        if (res.ok) {
+          const txt = await res.text();
+          if (txt && !txt.includes('45101')) html = txt;
+        }
+      } catch (e) {}
+    }
+
+    if (!recipeObj && (!html || html.length < 500)) {
       try {
         const res = await fetch(cleanUrl, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-          }
+          },
+          signal: AbortSignal.timeout(6000)
         });
         if (res.ok) html = await res.text();
       } catch (e) {}
     }
   }
 
-  let recipeObj = null;
-  if (html) {
+  if (!recipeObj && html) {
     const jsonLdMatches = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
     for (const scriptContent of jsonLdMatches) {
       try {

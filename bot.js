@@ -24,13 +24,55 @@ const RECIPES_FILE = path.join(__dirname, 'recipes_queue.json');
 
 const CHROME_PATH = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
-// In-Memory Recipe Cache for Telegram Callback Query buttons
+// Persistent Recipe Cache for Telegram Callback Query buttons
+const CACHE_FILE = path.join(__dirname, 'recipe_cache.json');
 const recipeCache = new Map();
-function saveCachedRecipe(shortId, url, title = '') {
-  recipeCache.set(shortId, { url, title, timestamp: Date.now() });
+
+// Hydrate recipe cache from disk on startup
+try {
+  if (fs.existsSync(CACHE_FILE)) {
+    const diskData = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+    for (const [k, v] of Object.entries(diskData)) {
+      recipeCache.set(k, v);
+    }
+  }
+} catch (e) {}
+
+function saveCachedRecipe(shortId, recipeOrUrl, title = '') {
+  let entry;
+  if (recipeOrUrl && typeof recipeOrUrl === 'object') {
+    entry = {
+      shortId,
+      url: recipeOrUrl.sourceUrl || recipeOrUrl.url || '',
+      title: recipeOrUrl.title || title || '',
+      recipe: recipeOrUrl,
+      timestamp: Date.now()
+    };
+  } else {
+    entry = {
+      shortId,
+      url: String(recipeOrUrl || ''),
+      title: title || '',
+      recipe: null,
+      timestamp: Date.now()
+    };
+  }
+  recipeCache.set(shortId, entry);
+  if (entry.url) {
+    recipeCache.set(entry.url, entry);
+  }
+  try {
+    const obj = {};
+    for (const [k, v] of recipeCache.entries()) {
+      obj[k] = v;
+    }
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(obj, null, 2));
+  } catch (e) {}
 }
-function getCachedRecipe(shortId) {
-  return recipeCache.get(shortId) || null;
+
+function getCachedRecipe(shortIdOrUrl) {
+  if (!shortIdOrUrl) return null;
+  return recipeCache.get(shortIdOrUrl) || null;
 }
 
 function loadTelegramConfig() {
@@ -478,18 +520,16 @@ async function pollUpdates() {
             const [, shortId, format, rawRatio] = cbData.split(':');
             const ratio = (rawRatio || '9-16').replace('-', ':');
 
-            let targetUrl = extractUrlFromCallbackMessage(cb);
-            let targetTitle = '';
-
-            if (!targetUrl && shortId) {
-              const cached = getCachedRecipe(shortId);
-              if (cached) {
-                targetUrl = cached.url;
-                targetTitle = cached.title || '';
-              }
+            const cached = shortId ? getCachedRecipe(shortId) : null;
+            let targetUrl = cached?.url || extractUrlFromCallbackMessage(cb);
+            let targetTitle = cached?.title || '';
+            let targetRecipe = cached?.recipe || null;
+            if (targetRecipe) {
+              if (!targetTitle) targetTitle = targetRecipe.title;
+              if (!targetUrl) targetUrl = targetRecipe.sourceUrl || targetRecipe.url;
             }
 
-            if (targetUrl) {
+            if (targetUrl || targetRecipe) {
               const ratioLabel = ratio === '1:1' ? '1:1 Square' : (ratio === '4:5' ? '4:5 Portrait' : '9:16 Vertical');
               const actionLabel = format === 'video' ? '🎬 60 FPS Video' : (format === 'slides' ? `📸 3 ${ratioLabel} Slides` : (format === 'caption' ? '📋 Viral Caption' : `⚡ Video + 3 Slides (${ratioLabel})`));
 
@@ -516,7 +556,10 @@ async function pollUpdates() {
               // Process rendering
               try {
                 const branding = loadBranding();
-                const recipe = await extractRecipe(targetUrl, branding);
+                const recipe = targetRecipe || (await extractRecipe(targetUrl, branding));
+                if (!targetRecipe && shortId) {
+                  saveCachedRecipe(shortId, recipe);
+                }
                 saveRecipeToQueue(recipe);
                 const caption = await generateSocialCaption(recipe);
 
@@ -828,7 +871,8 @@ async function pollUpdates() {
               const p = await extractRecipe(recipeUrl, branding);
               if (p?.title) {
                 previewTitle = p.title;
-                saveCachedRecipe(shortId, recipeUrl, previewTitle);
+                saveCachedRecipe(shortId, p);
+                saveRecipeToQueue(p);
               }
             } catch (e) {}
 
